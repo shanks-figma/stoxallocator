@@ -1,0 +1,19 @@
+/* Global tweaks for StoxAllocator - uses Tailwind for most styling */
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Avoid universal transitions; only subtle for buttons and inputs */
+button, input, select {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
