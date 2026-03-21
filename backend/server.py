@@ -263,17 +263,18 @@ async def auth_login():
 @api_router.get("/auth/callback")
 async def auth_callback(code: str = Query(None), error: str = Query(None)):
     """Receive OAuth callback from Upstox, exchange code for access token."""
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     if error:
-        return RedirectResponse(url=f"http://localhost:3000/admin?auth_error={error}")
+        return RedirectResponse(url=f"{frontend_url}/admin?auth_error={error}")
     if not code:
-        return RedirectResponse(url="http://localhost:3000/admin?auth_error=no_code")
+        return RedirectResponse(url=f"{frontend_url}/admin?auth_error=no_code")
 
     api_key = os.environ.get("UPSTOX_API_KEY")
     api_secret = os.environ.get("UPSTOX_API_SECRET")
     redirect_uri = os.environ.get("UPSTOX_REDIRECT_URI", "http://localhost:8001/api/auth/callback")
 
     if not api_secret:
-        return RedirectResponse(url="http://localhost:3000/admin?auth_error=no_api_secret_configured")
+        return RedirectResponse(url=f"{frontend_url}/admin?auth_error=no_api_secret_configured")
 
     # Exchange authorization code for access token
     try:
@@ -293,23 +294,23 @@ async def auth_callback(code: str = Query(None), error: str = Query(None)):
             if resp.status_code != 200:
                 detail = resp.text
                 logger.error(f"OAuth token exchange failed: {resp.status_code} — {detail}")
-                return RedirectResponse(url=f"http://localhost:3000/admin?auth_error=token_exchange_failed")
+                return RedirectResponse(url=f"{frontend_url}/admin?auth_error=token_exchange_failed")
 
             token_data = resp.json()
             access_token = token_data.get("access_token")
 
             if not access_token:
-                return RedirectResponse(url="http://localhost:3000/admin?auth_error=no_token_in_response")
+                return RedirectResponse(url=f"{frontend_url}/admin?auth_error=no_token_in_response")
 
             # Auto-save the token!
             await TokenStore.set_token(access_token)
             logger.info("OAuth: access token saved successfully via OAuth flow")
 
-            return RedirectResponse(url="http://localhost:3000/admin?auth_success=true")
+            return RedirectResponse(url=f"{frontend_url}/admin?auth_success=true")
 
     except Exception as e:
         logger.error(f"OAuth callback error: {e}")
-        return RedirectResponse(url=f"http://localhost:3000/admin?auth_error=exception")
+        return RedirectResponse(url=f"{frontend_url}/admin?auth_error=exception")
 
 @api_router.get("/auth/status")
 async def auth_status():
