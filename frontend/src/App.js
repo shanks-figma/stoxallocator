@@ -8,7 +8,7 @@ import { Input } from "./components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, Sun, Moon } from "lucide-react";
+import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, Sun, Moon, Zap } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API_BASE = `${BACKEND_URL}/api`;
@@ -87,16 +87,43 @@ function AllocatorPage() {
 
   useEffect(() => { let timerId; const poll = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("LTP poll error", e?.response?.data || e.message); } }; poll(); timerId = setInterval(poll, 30000); setPolling(true); return () => { clearInterval(timerId); setPolling(false); }; }, [portfolio, api]);
 
-  const portfolioWithLTP = useMemo(() => portfolio.map(item => { const quote = prices[item.instrument_key]; const ltp = quote?.last_price ?? item.last_price ?? null; const qty = Number(item.qty) || 0; const total = ltp ? ltp * qty : 0; const additional = total ? computeAdditionalCost(total, exchange) : 0; const finalCost = total + additional; return { ...item, ltp, total, additional, finalCost }; }), [portfolio, prices, exchange]);
+  const portfolioWithLTP = useMemo(() => {
+    const totalWeight = portfolio.reduce((sum, item) => sum + (6 - (item.priority || 3)), 0);
+    return portfolio.map(item => {
+      const quote = prices[item.instrument_key];
+      const ltp = quote?.last_price ?? item.last_price ?? null;
+      const qty = Number(item.qty) || 0;
+      const total = ltp ? ltp * qty : 0;
+      const additional = total ? computeAdditionalCost(total, exchange) : 0;
+      const finalCost = total + additional;
+      const weight = 6 - (item.priority || 3);
+      const allocatedBudget = totalWeight > 0 ? (weight / totalWeight) * (Number(budget) || 0) : 0;
+      return { ...item, ltp, total, additional, finalCost, allocatedBudget };
+    });
+  }, [portfolio, prices, exchange, budget]);
 
   const portfolioValue = useMemo(() => portfolioWithLTP.reduce((s, i) => s + (i.total || 0), 0), [portfolioWithLTP]);
   const finalCostTotal = useMemo(() => portfolioWithLTP.reduce((s, i) => s + (i.finalCost || 0), 0), [portfolioWithLTP]);
   const remaining = useMemo(() => (Number(budget) || 0) - finalCostTotal, [budget, finalCostTotal]);
   const progressPct = budget > 0 ? Math.min((finalCostTotal / budget) * 100, 100) : 0;
 
-  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
+  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, priority: 3, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
   const removeFromPortfolio = (instrument_key) => { setPortfolio(prev => prev.filter(p => p.instrument_key !== instrument_key)); };
   const updateQty = (instrument_key, qty) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, qty: Math.max(0, Number(qty) || 0) } : p)); };
+  const updatePriority = (instrument_key, priority) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, priority: Math.min(5, Math.max(1, Number(priority) || 3)) } : p)); };
+  const autoAllocate = () => {
+    const eligible = portfolioWithLTP.filter(item => item.ltp > 0);
+    if (eligible.length === 0) return;
+    const totalWeight = eligible.reduce((sum, item) => sum + (6 - (item.priority || 3)), 0);
+    setPortfolio(prev => prev.map(item => {
+      const live = eligible.find(e => e.instrument_key === item.instrument_key);
+      if (!live) return item;
+      const weight = 6 - (item.priority || 3);
+      const allocatedBudget = (weight / totalWeight) * (Number(budget) || 0);
+      const qty = Math.floor(allocatedBudget / live.ltp);
+      return { ...item, qty: Math.max(0, qty) };
+    }));
+  };
   const refreshOnce = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("Manual refresh error", e?.response?.data || e.message); } };
 
   return (
@@ -172,14 +199,24 @@ function AllocatorPage() {
                     <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">{portfolio.length} stocks</span>
                   )}
                 </div>
-                <button
-                  onClick={refreshOnce}
-                  disabled={portfolio.length === 0}
-                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />
-                  Refresh
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={autoAllocate}
+                    disabled={portfolio.length === 0}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-medium"
+                    title="Auto-distribute budget by priority"
+                  >
+                    <Zap className="h-3.5 w-3.5" /> Auto-Allocate
+                  </button>
+                  <button
+                    onClick={refreshOnce}
+                    disabled={portfolio.length === 0}
+                    className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                </div>
               </div>
 
               {portfolio.length === 0 ? (
@@ -196,8 +233,19 @@ function AllocatorPage() {
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
                         <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium px-5 py-3">Stock</th>
+                        <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger className="cursor-help underline decoration-dotted">Priority</TooltipTrigger>
+                              <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200 text-xs max-w-xs">
+                                1 = highest (gets most budget), 5 = lowest. Click Auto-Allocate to distribute.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </th>
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
+                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Allocated</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
                           <TooltipProvider>
@@ -223,14 +271,27 @@ function AllocatorPage() {
                           <td className="px-3 py-3.5 text-center">
                             <input
                               type="number"
+                              min="1"
+                              max="5"
+                              value={row.priority || 3}
+                              onChange={(e) => updatePriority(row.instrument_key, e.target.value)}
+                              className="h-8 w-12 text-center text-sm bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            <input
+                              type="number"
                               min="0"
                               value={row.qty}
                               onChange={(e) => updateQty(row.instrument_key, e.target.value)}
-                              className="h-8 w-16 text-center text-sm bg-slate-800 border border-slate-700 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              className="h-8 w-16 text-center text-sm bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                             />
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {row.ltp ? formatINR(row.ltp) : <span className="text-slate-600">—</span>}
+                          </td>
+                          <td className="px-3 py-3.5 text-right font-mono text-xs">
+                            <span className="text-blue-500 dark:text-blue-400">{formatINR(row.allocatedBudget || 0)}</span>
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {formatINR(row.total || 0)}
