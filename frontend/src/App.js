@@ -8,7 +8,7 @@ import { Input } from "./components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, Sun, Moon, Zap } from "lucide-react";
+import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, ChevronUp, ChevronDown, Sun, Moon, Zap } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API_BASE = `${BACKEND_URL}/api`;
@@ -88,15 +88,16 @@ function AllocatorPage() {
   useEffect(() => { let timerId; const poll = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("LTP poll error", e?.response?.data || e.message); } }; poll(); timerId = setInterval(poll, 30000); setPolling(true); return () => { clearInterval(timerId); setPolling(false); }; }, [portfolio, api]);
 
   const portfolioWithLTP = useMemo(() => {
-    const totalWeight = portfolio.reduce((sum, item) => sum + (6 - (item.priority || 3)), 0);
-    return portfolio.map(item => {
+    const n = portfolio.length;
+    const totalWeight = n * (n + 1) / 2;
+    return portfolio.map((item, index) => {
       const quote = prices[item.instrument_key];
       const ltp = quote?.last_price ?? item.last_price ?? null;
       const qty = Number(item.qty) || 0;
       const total = ltp ? ltp * qty : 0;
       const additional = total ? computeAdditionalCost(total, exchange) : 0;
       const finalCost = total + additional;
-      const weight = 6 - (item.priority || 3);
+      const weight = n - index;
       const allocatedBudget = totalWeight > 0 ? (weight / totalWeight) * (Number(budget) || 0) : 0;
       return { ...item, ltp, total, additional, finalCost, allocatedBudget };
     });
@@ -107,22 +108,28 @@ function AllocatorPage() {
   const remaining = useMemo(() => (Number(budget) || 0) - finalCostTotal, [budget, finalCostTotal]);
   const progressPct = budget > 0 ? Math.min((finalCostTotal / budget) * 100, 100) : 0;
 
-  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, priority: 3, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
+  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
   const removeFromPortfolio = (instrument_key) => { setPortfolio(prev => prev.filter(p => p.instrument_key !== instrument_key)); };
   const updateQty = (instrument_key, qty) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, qty: Math.max(0, Number(qty) || 0) } : p)); };
-  const updatePriority = (instrument_key, priority) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, priority: Math.min(5, Math.max(1, Number(priority) || 3)) } : p)); };
+  const moveUp = (index) => { if (index === 0) return; setPortfolio(prev => { const next = [...prev]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; }); };
+  const moveDown = (index) => { setPortfolio(prev => { if (index === prev.length - 1) return prev; const next = [...prev]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; }); };
   const autoAllocate = () => {
     const eligible = portfolioWithLTP.filter(item => item.ltp > 0);
     if (eligible.length === 0) return;
-    const totalWeight = eligible.reduce((sum, item) => sum + (6 - (item.priority || 3)), 0);
-    setPortfolio(prev => prev.map(item => {
-      const live = eligible.find(e => e.instrument_key === item.instrument_key);
-      if (!live) return item;
-      const weight = 6 - (item.priority || 3);
-      const allocatedBudget = (weight / totalWeight) * (Number(budget) || 0);
-      const qty = Math.floor(allocatedBudget / live.ltp);
-      return { ...item, qty: Math.max(0, qty) };
-    }));
+    const n = eligible.length;
+    const totalWeight = n * (n + 1) / 2;
+    setPortfolio(prev => {
+      let eligibleIndex = 0;
+      return prev.map(item => {
+        const live = eligible.find(e => e.instrument_key === item.instrument_key);
+        if (!live) return item;
+        const weight = n - eligibleIndex;
+        eligibleIndex++;
+        const allocatedBudget = (weight / totalWeight) * (Number(budget) || 0);
+        const qty = Math.floor(allocatedBudget / live.ltp);
+        return { ...item, qty: Math.max(0, qty) };
+      });
+    });
   };
   const refreshOnce = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("Manual refresh error", e?.response?.data || e.message); } };
 
@@ -236,9 +243,9 @@ function AllocatorPage() {
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
                           <TooltipProvider>
                             <Tooltip>
-                              <TooltipTrigger className="cursor-help underline decoration-dotted">Priority</TooltipTrigger>
+                              <TooltipTrigger className="cursor-help underline decoration-dotted">Order</TooltipTrigger>
                               <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200 text-xs max-w-xs">
-                                1 = highest (gets most budget), 5 = lowest. Click Auto-Allocate to distribute.
+                                Top stock gets the most budget. Use ▲▼ to reorder. Click Auto-Allocate to distribute.
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -262,21 +269,32 @@ function AllocatorPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-slate-800/60">
-                      {portfolioWithLTP.map((row) => (
+                      {portfolioWithLTP.map((row, index) => (
                         <tr key={row.instrument_key} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
                           <td className="px-5 py-3.5">
                             <div className="font-semibold text-gray-900 dark:text-white">{row.tradingsymbol || row.name}</div>
                             <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
-                            <input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={row.priority || 3}
-                              onChange={(e) => updatePriority(row.instrument_key, e.target.value)}
-                              className="h-8 w-12 text-center text-sm bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-xs font-semibold text-emerald-500 w-6">#{index + 1}</span>
+                              <div className="flex flex-col gap-0.5">
+                                <button
+                                  onClick={() => moveUp(index)}
+                                  disabled={index === 0}
+                                  className="h-5 w-5 flex items-center justify-center rounded text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <ChevronUp className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => moveDown(index)}
+                                  disabled={index === portfolio.length - 1}
+                                  className="h-5 w-5 flex items-center justify-center rounded text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
                             <input
