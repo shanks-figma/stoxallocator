@@ -15,6 +15,10 @@ import gzip
 import json
 import re
 import asyncio
+import base64
+import random
+import string
+from urllib.parse import urlparse, parse_qs
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pyotp
@@ -242,24 +246,43 @@ async def scheduler_status(x_admin_key: Optional[str] = Header(None)):
     }
 
 # ===== OAuth: Upstox Login Flow =====
-UPSTOX_AUTH_URL      = "https://api.upstox.com/v2/login/authorization/dialog"
-UPSTOX_TOKEN_URL     = "https://api.upstox.com/v2/login/authorization/token"
-UPSTOX_MOBILE_URL    = "https://api.upstox.com/v2/login/mobile-number/verify"
-UPSTOX_PIN_URL       = "https://api.upstox.com/v2/login/pin/verify"
-UPSTOX_TOTP_URL      = "https://api.upstox.com/v2/login/totp/verify"
+UPSTOX_AUTH_URL    = "https://api.upstox.com/v2/login/authorization/dialog"
+UPSTOX_TOKEN_URL   = "https://api.upstox.com/v2/login/authorization/token"
+UPSTOX_SERVICE_URL = "https://service.upstox.com"
+
+
+def _request_id() -> str:
+    return "WPRO-" + "".join(random.choices(string.ascii_letters + string.digits, k=10))
+
+
+def _browser_headers() -> dict:
+    return {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "origin": "https://login.upstox.com",
+        "referer": "https://login.upstox.com/",
+        "user-agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "x-device-details": "platform=WEB|osName=Mac OS/10.15.7|osVersion=10.15.7|appName=chrome|appVersion=131.0.0.0",
+        "x-request-id": _request_id(),
+    }
 
 
 async def upstox_headless_login() -> str:
     """
     Fully automated Upstox login using mobile + PIN + TOTP.
+    Flow: auth-dialog → OTP generate → TOTP verify → PIN 2FA → OAuth authorize → token exchange
     Returns a fresh access_token string on success.
     Raises RuntimeError with a human-readable message on failure.
     """
-    mobile      = os.environ.get("UPSTOX_MOBILE", "").strip()
-    pin         = os.environ.get("UPSTOX_PIN", "").strip()
-    totp_secret = os.environ.get("UPSTOX_TOTP_SECRET", "").strip()
-    api_key     = os.environ.get("UPSTOX_API_KEY", "").strip()
-    api_secret  = os.environ.get("UPSTOX_API_SECRET", "").strip()
+    mobile       = os.environ.get("UPSTOX_MOBILE", "").strip()
+    pin          = os.environ.get("UPSTOX_PIN", "").strip()
+    totp_secret  = os.environ.get("UPSTOX_TOTP_SECRET", "").strip()
+    api_key      = os.environ.get("UPSTOX_API_KEY", "").strip()
+    api_secret   = os.environ.get("UPSTOX_API_SECRET", "").strip()
     redirect_uri = os.environ.get("UPSTOX_REDIRECT_URI", "http://localhost:8001/api/auth/callback").strip()
 
     missing = [k for k, v in [
@@ -270,48 +293,80 @@ async def upstox_headless_login() -> str:
     if missing:
         raise RuntimeError(f"Missing / placeholder .env values: {', '.join(missing)}")
 
-    json_headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as session:
 
-    async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as session:
+        # ── Step 1: auth dialog → extract userId ───────────────────────────
+        r1 = await session.get(
+            UPSTOX_AUTH_URL,
+            params={"response_type": "code", "client_id": api_key, "redirect_uri": redirect_uri},
+        )
+        final_params = parse_qs(urlparse(str(r1.url)).query)
+        user_id = (final_params.get("userId") or final_params.get("userid") or [None])[0]
+        if not user_id:
+            raise RuntimeError(f"Could not extract userId from auth dialog redirect: {r1.url}")
+        logger.info(f"Auto-login step 1 (userId) ✓ — {user_id}")
 
-        # ── Step 1: send mobile number ──────────────────────────────────────
-        r1 = await session.post(UPSTOX_MOBILE_URL, json={"mobile_number": mobile}, headers=json_headers)
-        if r1.status_code != 200:
-            raise RuntimeError(f"Mobile verify failed ({r1.status_code}): {r1.text}")
-        step1_token = r1.json().get("data", {}).get("token", "")
-        if not step1_token:
-            raise RuntimeError(f"No token in mobile-verify response: {r1.text}")
-        logger.info("Auto-login step 1 (mobile) ✓")
-
-        # ── Step 2: verify PIN ──────────────────────────────────────────────
+        # ── Step 2: generate OTP/TOTP request ──────────────────────────────
         r2 = await session.post(
-            UPSTOX_PIN_URL,
-            json={"pin": pin, "api_version": "2.0"},
-            headers={**json_headers, "Authorization": f"Bearer {step1_token}"},
+            f"{UPSTOX_SERVICE_URL}/login/open/v6/auth/1fa/otp/generate",
+            json={"data": {"mobileNumber": mobile, "userId": user_id}},
+            headers=_browser_headers(),
         )
         if r2.status_code != 200:
-            raise RuntimeError(f"PIN verify failed ({r2.status_code}): {r2.text}")
-        step2_token = r2.json().get("data", {}).get("token", "")
-        if not step2_token:
-            raise RuntimeError(f"No token in pin-verify response: {r2.text}")
-        logger.info("Auto-login step 2 (PIN) ✓")
+            raise RuntimeError(f"OTP generate failed ({r2.status_code}): {r2.text}")
+        validate_otp_token = r2.json().get("data", {}).get("validateOTPToken", "")
+        if not validate_otp_token:
+            raise RuntimeError(f"No validateOTPToken in OTP generate response: {r2.text}")
+        logger.info("Auto-login step 2 (OTP generate) ✓")
 
         # ── Step 3: verify TOTP ─────────────────────────────────────────────
         totp_code = pyotp.TOTP(totp_secret).now()
         r3 = await session.post(
-            UPSTOX_TOTP_URL,
-            json={"totp": totp_code},
-            headers={**json_headers, "Authorization": f"Bearer {step2_token}"},
+            f"{UPSTOX_SERVICE_URL}/login/open/v4/auth/1fa/otp-totp/verify",
+            json={"data": {"otp": totp_code, "validateOtpToken": validate_otp_token}},
+            headers=_browser_headers(),
         )
         if r3.status_code != 200:
             raise RuntimeError(f"TOTP verify failed ({r3.status_code}): {r3.text}")
-        auth_code = r3.json().get("data", {}).get("code", "")
-        if not auth_code:
-            raise RuntimeError(f"No auth_code in totp-verify response: {r3.text}")
         logger.info("Auto-login step 3 (TOTP) ✓")
 
-        # ── Step 4: exchange auth_code for access_token ─────────────────────
+        # ── Step 4: submit PIN (base64-encoded) ─────────────────────────────
+        pin_b64 = base64.b64encode(pin.encode()).decode()
         r4 = await session.post(
+            f"{UPSTOX_SERVICE_URL}/login/open/v3/auth/2fa",
+            params={
+                "client_id": api_key,
+                "redirect_uri": "https://api-v2.upstox.com/login/authorization/redirect",
+            },
+            json={"data": {"twoFAMethod": "SECRET_PIN", "inputText": pin_b64}},
+            headers=_browser_headers(),
+        )
+        if r4.status_code != 200:
+            raise RuntimeError(f"PIN 2FA failed ({r4.status_code}): {r4.text}")
+        logger.info("Auto-login step 4 (PIN) ✓")
+
+        # ── Step 5: OAuth authorize → get auth code ─────────────────────────
+        r5 = await session.post(
+            f"{UPSTOX_SERVICE_URL}/login/v2/oauth/authorize",
+            params={
+                "client_id": api_key,
+                "redirect_uri": "https://api-v2.upstox.com/login/authorization/redirect",
+                "requestId": _request_id(),
+                "response_type": "code",
+            },
+            json={"data": {"userOAuthApproval": True}},
+            headers=_browser_headers(),
+        )
+        if r5.status_code != 200:
+            raise RuntimeError(f"OAuth authorize failed ({r5.status_code}): {r5.text}")
+        redirect_url = r5.json().get("data", {}).get("redirectUri", "")
+        auth_code = parse_qs(urlparse(redirect_url).query).get("code", [None])[0]
+        if not auth_code:
+            raise RuntimeError(f"No auth code in OAuth authorize response: {r5.text}")
+        logger.info("Auto-login step 5 (OAuth) ✓")
+
+        # ── Step 6: exchange auth code for access token ─────────────────────
+        r6 = await session.post(
             UPSTOX_TOKEN_URL,
             data={
                 "code": auth_code,
@@ -322,12 +377,12 @@ async def upstox_headless_login() -> str:
             },
             headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
         )
-        if r4.status_code != 200:
-            raise RuntimeError(f"Token exchange failed ({r4.status_code}): {r4.text}")
-        access_token = r4.json().get("access_token", "")
+        if r6.status_code != 200:
+            raise RuntimeError(f"Token exchange failed ({r6.status_code}): {r6.text}")
+        access_token = r6.json().get("access_token", "")
         if not access_token:
-            raise RuntimeError(f"No access_token in token-exchange response: {r4.text}")
-        logger.info("Auto-login step 4 (token exchange) ✓")
+            raise RuntimeError(f"No access_token in token-exchange response: {r6.text}")
+        logger.info("Auto-login step 6 (token exchange) ✓")
 
         return access_token
 
