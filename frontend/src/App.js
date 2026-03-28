@@ -118,18 +118,52 @@ function AllocatorPage() {
     if (eligible.length === 0) return;
     const n = eligible.length;
     const totalWeight = n * (n + 1) / 2;
-    setPortfolio(prev => {
-      let eligibleIndex = 0;
-      return prev.map(item => {
-        const live = eligible.find(e => e.instrument_key === item.instrument_key);
-        if (!live) return item;
-        const weight = n - eligibleIndex;
-        eligibleIndex++;
-        const allocatedBudget = (weight / totalWeight) * (Number(budget) || 0);
-        const qty = Math.floor(allocatedBudget / live.ltp);
-        return { ...item, qty: Math.max(0, qty) };
-      });
-    });
+    const totalBudget = Number(budget) || 0;
+
+    // Step 1: initial weighted allocation using Math.floor
+    const qtys = {};
+    let eligibleIndex = 0;
+    for (const item of eligible) {
+      const weight = n - eligibleIndex;
+      eligibleIndex++;
+      const allocatedBudget = (weight / totalWeight) * totalBudget;
+      qtys[item.instrument_key] = Math.max(0, Math.floor(allocatedBudget / item.ltp));
+    }
+
+    // Step 2: greedily fill remaining with the cheapest stock (incl. charges) until nothing fits
+    const computeSpent = () => eligible.reduce((s, item) => {
+      const qty = qtys[item.instrument_key];
+      const total = qty * item.ltp;
+      return s + total + computeAdditionalCost(total, exchange);
+    }, 0);
+
+    let remaining = totalBudget - computeSpent();
+    const sortedByPrice = [...eligible].sort((a, b) => a.ltp - b.ltp);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const item of sortedByPrice) {
+        const curQty = qtys[item.instrument_key];
+        const oldTotal = curQty * item.ltp;
+        const newTotal = (curQty + 1) * item.ltp;
+        const marginalCost = item.ltp
+          + computeAdditionalCost(newTotal, exchange)
+          - computeAdditionalCost(oldTotal, exchange);
+        if (marginalCost <= remaining) {
+          qtys[item.instrument_key] += 1;
+          remaining -= marginalCost;
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    setPortfolio(prev => prev.map(item => {
+      if (qtys[item.instrument_key] !== undefined) {
+        return { ...item, qty: qtys[item.instrument_key] };
+      }
+      return item;
+    }));
   };
   const refreshOnce = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("Manual refresh error", e?.response?.data || e.message); } };
 
