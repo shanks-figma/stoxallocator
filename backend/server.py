@@ -242,8 +242,94 @@ async def scheduler_status(x_admin_key: Optional[str] = Header(None)):
     }
 
 # ===== OAuth: Upstox Login Flow =====
-UPSTOX_AUTH_URL = "https://api.upstox.com/v2/login/authorization/dialog"
-UPSTOX_TOKEN_URL = "https://api.upstox.com/v2/login/authorization/token"
+UPSTOX_AUTH_URL      = "https://api.upstox.com/v2/login/authorization/dialog"
+UPSTOX_TOKEN_URL     = "https://api.upstox.com/v2/login/authorization/token"
+UPSTOX_MOBILE_URL    = "https://api.upstox.com/v2/login/mobile-number/verify"
+UPSTOX_PIN_URL       = "https://api.upstox.com/v2/login/pin/verify"
+UPSTOX_TOTP_URL      = "https://api.upstox.com/v2/login/totp/verify"
+
+
+async def upstox_headless_login() -> str:
+    """
+    Fully automated Upstox login using mobile + PIN + TOTP.
+    Returns a fresh access_token string on success.
+    Raises RuntimeError with a human-readable message on failure.
+    """
+    mobile      = os.environ.get("UPSTOX_MOBILE", "").strip()
+    pin         = os.environ.get("UPSTOX_PIN", "").strip()
+    totp_secret = os.environ.get("UPSTOX_TOTP_SECRET", "").strip()
+    api_key     = os.environ.get("UPSTOX_API_KEY", "").strip()
+    api_secret  = os.environ.get("UPSTOX_API_SECRET", "").strip()
+    redirect_uri = os.environ.get("UPSTOX_REDIRECT_URI", "http://localhost:8001/api/auth/callback").strip()
+
+    missing = [k for k, v in [
+        ("UPSTOX_MOBILE", mobile), ("UPSTOX_PIN", pin),
+        ("UPSTOX_TOTP_SECRET", totp_secret), ("UPSTOX_API_KEY", api_key),
+        ("UPSTOX_API_SECRET", api_secret),
+    ] if not v or v.startswith("your_")]
+    if missing:
+        raise RuntimeError(f"Missing / placeholder .env values: {', '.join(missing)}")
+
+    json_headers = {"Content-Type": "application/json", "Accept": "application/json"}
+
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as session:
+
+        # ── Step 1: send mobile number ──────────────────────────────────────
+        r1 = await session.post(UPSTOX_MOBILE_URL, json={"mobile_number": mobile}, headers=json_headers)
+        if r1.status_code != 200:
+            raise RuntimeError(f"Mobile verify failed ({r1.status_code}): {r1.text}")
+        step1_token = r1.json().get("data", {}).get("token", "")
+        if not step1_token:
+            raise RuntimeError(f"No token in mobile-verify response: {r1.text}")
+        logger.info("Auto-login step 1 (mobile) ✓")
+
+        # ── Step 2: verify PIN ──────────────────────────────────────────────
+        r2 = await session.post(
+            UPSTOX_PIN_URL,
+            json={"pin": pin, "api_version": "2.0"},
+            headers={**json_headers, "Authorization": f"Bearer {step1_token}"},
+        )
+        if r2.status_code != 200:
+            raise RuntimeError(f"PIN verify failed ({r2.status_code}): {r2.text}")
+        step2_token = r2.json().get("data", {}).get("token", "")
+        if not step2_token:
+            raise RuntimeError(f"No token in pin-verify response: {r2.text}")
+        logger.info("Auto-login step 2 (PIN) ✓")
+
+        # ── Step 3: verify TOTP ─────────────────────────────────────────────
+        totp_code = pyotp.TOTP(totp_secret).now()
+        r3 = await session.post(
+            UPSTOX_TOTP_URL,
+            json={"totp": totp_code},
+            headers={**json_headers, "Authorization": f"Bearer {step2_token}"},
+        )
+        if r3.status_code != 200:
+            raise RuntimeError(f"TOTP verify failed ({r3.status_code}): {r3.text}")
+        auth_code = r3.json().get("data", {}).get("code", "")
+        if not auth_code:
+            raise RuntimeError(f"No auth_code in totp-verify response: {r3.text}")
+        logger.info("Auto-login step 3 (TOTP) ✓")
+
+        # ── Step 4: exchange auth_code for access_token ─────────────────────
+        r4 = await session.post(
+            UPSTOX_TOKEN_URL,
+            data={
+                "code": auth_code,
+                "client_id": api_key,
+                "client_secret": api_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        )
+        if r4.status_code != 200:
+            raise RuntimeError(f"Token exchange failed ({r4.status_code}): {r4.text}")
+        access_token = r4.json().get("access_token", "")
+        if not access_token:
+            raise RuntimeError(f"No access_token in token-exchange response: {r4.text}")
+        logger.info("Auto-login step 4 (token exchange) ✓")
+
+        return access_token
 
 @api_router.get("/auth/login")
 async def auth_login():
@@ -318,15 +404,48 @@ async def auth_status():
     api_key = os.environ.get("UPSTOX_API_KEY")
     api_secret = os.environ.get("UPSTOX_API_SECRET")
     redirect_uri = os.environ.get("UPSTOX_REDIRECT_URI")
+    mobile = os.environ.get("UPSTOX_MOBILE", "")
+    pin = os.environ.get("UPSTOX_PIN", "")
+    totp_secret = os.environ.get("UPSTOX_TOTP_SECRET", "")
+    auto_login_ready = bool(
+        mobile and not mobile.startswith("your_") and
+        pin and not pin.startswith("your_") and
+        totp_secret
+    )
     return {
         "status": "success",
         "data": {
             "oauth_configured": bool(api_key and api_secret),
             "has_api_key": bool(api_key),
             "has_api_secret": bool(api_secret),
-            "redirect_uri": redirect_uri or "not set"
+            "redirect_uri": redirect_uri or "not set",
+            "auto_login_ready": auto_login_ready,
         }
     }
+
+
+@api_router.post("/auth/auto-login")
+async def trigger_auto_login(x_admin_key: str = Header(None)):
+    """
+    Headless auto-login: mobile → PIN → TOTP → access token.
+    Saves the token automatically. Protected by admin key.
+    """
+    admin_key = os.environ.get("ADMIN_KEY")
+    if not admin_key or x_admin_key != admin_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
+
+    try:
+        access_token = await upstox_headless_login()
+        await TokenStore.set_token(access_token)
+        logger.info("Auto-login: token saved successfully")
+        return {"status": "success", "message": "Logged in and token saved successfully"}
+    except RuntimeError as e:
+        logger.error(f"Auto-login failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Auto-login unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Auto-login failed unexpectedly")
+
 
 # ===== core headers using server token =====
 async def _upstox_headers() -> Dict[str, str]:
@@ -930,103 +1049,133 @@ class TokenRefreshStatus(BaseModel):
     error_message: Optional[str] = None
 
 async def refresh_upstox_token():
-    """Check token validity daily at 9:00 AM IST and flag if expired"""
+    """
+    Daily job at 9:00 AM IST:
+    1. If auto-login credentials are configured → headless login, save fresh token.
+    2. Otherwise → validate existing token and flag if expired.
+    """
+    now = datetime.now(timezone.utc).isoformat()
     try:
-        logger.info("Starting daily token validity check...")
+        mobile = os.environ.get("UPSTOX_MOBILE", "")
+        pin    = os.environ.get("UPSTOX_PIN", "")
+        totp   = os.environ.get("UPSTOX_TOTP_SECRET", "")
+        auto_login_ready = bool(
+            mobile and not mobile.startswith("your_") and
+            pin and not pin.startswith("your_") and
+            totp
+        )
 
+        if auto_login_ready:
+            # ── Auto-login path ────────────────────────────────────────────
+            logger.info("Scheduler: running headless auto-login...")
+            try:
+                access_token = await upstox_headless_login()
+                await TokenStore.set_token(access_token)
+                logger.info("Scheduler: auto-login succeeded, token saved ✓")
+                await db.config.update_one(
+                    {"id": "token_refresh_status"},
+                    {"$set": {
+                        "id": "token_refresh_status",
+                        "last_refresh": now,
+                        "status": "auto_login_success",
+                        "error_message": None,
+                        "needs_refresh": False,
+                    }},
+                    upsert=True,
+                )
+            except Exception as login_err:
+                logger.error(f"Scheduler: auto-login failed: {login_err}")
+                await db.config.update_one(
+                    {"id": "token_refresh_status"},
+                    {"$set": {
+                        "id": "token_refresh_status",
+                        "last_refresh": now,
+                        "status": "auto_login_failed",
+                        "error_message": str(login_err),
+                        "needs_refresh": True,
+                    }},
+                    upsert=True,
+                )
+            return
+
+        # ── Manual-token validation path ───────────────────────────────────
+        logger.info("Scheduler: auto-login not configured, checking existing token...")
         current_token = TokenStore.get_token()
 
         if not current_token:
-            logger.warning("No token found - user needs to authenticate via OAuth")
+            logger.warning("No token found - fill UPSTOX_MOBILE and UPSTOX_PIN in .env for auto-login")
             await db.config.update_one(
                 {"id": "token_refresh_status"},
-                {
-                    "$set": {
-                        "id": "token_refresh_status",
-                        "last_refresh": datetime.now(timezone.utc).isoformat(),
-                        "status": "token_missing",
-                        "error_message": "No token available - please login via OAuth",
-                        "needs_refresh": True
-                    }
-                },
-                upsert=True
+                {"$set": {
+                    "id": "token_refresh_status",
+                    "last_refresh": now,
+                    "status": "token_missing",
+                    "error_message": "No token available. Fill UPSTOX_MOBILE & UPSTOX_PIN in .env to enable auto-login.",
+                    "needs_refresh": True,
+                }},
+                upsert=True,
             )
             return
 
-        # Check if token is still valid by making a test API call
         try:
             async with httpx.AsyncClient(timeout=10.0) as session:
                 resp = await session.get(
                     f"{UPSTOX_BASE_URL}/user/profile",
                     headers={"Authorization": f"Bearer {current_token}"}
                 )
-
                 if resp.status_code == 200:
-                    # Token is valid
-                    logger.info("✓ Token is still valid - no refresh needed")
+                    logger.info("✓ Token is still valid")
                     await db.config.update_one(
                         {"id": "token_refresh_status"},
-                        {
-                            "$set": {
-                                "id": "token_refresh_status",
-                                "last_refresh": datetime.now(timezone.utc).isoformat(),
-                                "status": "valid",
-                                "error_message": None,
-                                "needs_refresh": False
-                            }
-                        },
-                        upsert=True
+                        {"$set": {
+                            "id": "token_refresh_status",
+                            "last_refresh": now,
+                            "status": "valid",
+                            "error_message": None,
+                            "needs_refresh": False,
+                        }},
+                        upsert=True,
                     )
                     return
-
-                # Token invalid (401/403)
                 if resp.status_code in [401, 403]:
-                    logger.warning("⚠ Token expired - user needs to re-login via OAuth")
+                    logger.warning("⚠ Token expired - fill UPSTOX_MOBILE & UPSTOX_PIN in .env for auto-login")
                     await db.config.update_one(
                         {"id": "token_refresh_status"},
-                        {
-                            "$set": {
-                                "id": "token_refresh_status",
-                                "last_refresh": datetime.now(timezone.utc).isoformat(),
-                                "status": "expired",
-                                "error_message": "Token expired at 3:30 AM IST - please login via OAuth",
-                                "needs_refresh": True
-                            }
-                        },
-                        upsert=True
+                        {"$set": {
+                            "id": "token_refresh_status",
+                            "last_refresh": now,
+                            "status": "expired",
+                            "error_message": "Token expired. Fill UPSTOX_MOBILE & UPSTOX_PIN in .env to enable auto-login.",
+                            "needs_refresh": True,
+                        }},
+                        upsert=True,
                     )
                     return
-
-                raise ValueError(f"Unexpected response: {resp.status_code}")
-
+                raise ValueError(f"Unexpected status: {resp.status_code}")
         except Exception as check_error:
-            logger.error(f"Token validity check failed: {check_error}")
+            logger.error(f"Token check failed: {check_error}")
             await db.config.update_one(
                 {"id": "token_refresh_status"},
-                {
-                    "$set": {
-                        "id": "token_refresh_status",
-                        "last_refresh": datetime.now(timezone.utc).isoformat(),
-                        "status": "check_failed",
-                        "error_message": str(check_error)
-                    }
-                },
-                upsert=True
+                {"$set": {
+                    "id": "token_refresh_status",
+                    "last_refresh": now,
+                    "status": "check_failed",
+                    "error_message": str(check_error),
+                }},
+                upsert=True,
             )
 
     except Exception as e:
-        logger.error(f"Daily token check failed: {str(e)}")
+        logger.error(f"Daily token job failed: {e}")
         await db.config.update_one(
             {"id": "token_refresh_status"},
-            {
-                "$set": {
-                    "id": "token_refresh_status",
-                    "status": "failed",
-                    "error_message": str(e),
-                    "last_attempt": datetime.now(timezone.utc).isoformat()
-                }
-            },
-            upsert=True
+            {"$set": {
+                "id": "token_refresh_status",
+                "status": "failed",
+                "error_message": str(e),
+                "last_attempt": now,
+            }},
+            upsert=True,
         )
 
 @app.on_event("startup")
