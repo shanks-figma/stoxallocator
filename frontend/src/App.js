@@ -8,7 +8,7 @@ import { Input } from "./components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, ChevronUp, ChevronDown, Sun, Moon, Zap } from "lucide-react";
+import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, ChevronUp, ChevronDown, Sun, Moon, Zap, GripVertical } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API_BASE = `${BACKEND_URL}/api`;
@@ -275,16 +275,7 @@ function AllocatorPage() {
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
                         <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium px-5 py-3">Stock</th>
-                        <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger className="cursor-help underline decoration-dotted">Order</TooltipTrigger>
-                              <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200 text-xs max-w-xs">
-                                Top stock gets the most budget. Use ▲▼ to reorder. Click Auto-Allocate to distribute.
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </th>
+                        <th className="w-10 px-3 py-3"></th>
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
@@ -310,24 +301,22 @@ function AllocatorPage() {
                             <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="text-xs font-semibold text-emerald-500 w-6">#{index + 1}</span>
-                              <div className="flex flex-col gap-0.5">
-                                <button
-                                  onClick={() => moveUp(index)}
-                                  disabled={index === 0}
-                                  className="h-5 w-5 flex items-center justify-center rounded text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  <ChevronUp className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => moveDown(index)}
-                                  disabled={index === portfolio.length - 1}
-                                  className="h-5 w-5 flex items-center justify-center rounded text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  <ChevronDown className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
+                            <div className="flex flex-col items-center gap-0.5 group">
+                              <button
+                                onClick={() => moveUp(index)}
+                                disabled={index === 0}
+                                className="h-5 w-5 flex items-center justify-center rounded text-gray-300 dark:text-slate-600 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-0 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </button>
+                              <GripVertical className="h-4 w-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-400 dark:group-hover:text-slate-500 transition-colors" />
+                              <button
+                                onClick={() => moveDown(index)}
+                                disabled={index === portfolio.length - 1}
+                                className="h-5 w-5 flex items-center justify-center rounded text-gray-300 dark:text-slate-600 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-0 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </button>
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
