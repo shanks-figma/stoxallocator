@@ -274,8 +274,8 @@ function AllocatorPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
-                        <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium px-5 py-3">Stock</th>
                         <th className="w-10 px-3 py-3"></th>
+                        <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium px-5 py-3">Stock</th>
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
@@ -296,10 +296,6 @@ function AllocatorPage() {
                     <tbody className="divide-y divide-gray-200 dark:divide-slate-800/60">
                       {portfolioWithLTP.map((row, index) => (
                         <tr key={row.instrument_key} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <div className="font-semibold text-gray-900 dark:text-white">{row.tradingsymbol || row.name}</div>
-                            <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
-                          </td>
                           <td className="px-3 py-3.5 text-center">
                             <div className="flex flex-col items-center gap-0.5 group">
                               <button
@@ -318,6 +314,10 @@ function AllocatorPage() {
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </button>
                             </div>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="font-semibold text-gray-900 dark:text-white">{row.tradingsymbol || row.name}</div>
+                            <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
                             <div className="inline-flex items-center border border-gray-200 dark:border-slate-700 rounded-md overflow-hidden">
