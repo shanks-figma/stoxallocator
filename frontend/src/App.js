@@ -295,7 +295,6 @@ function AllocatorPage() {
                         </th>
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
-                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Allocated</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
                           <TooltipProvider>
@@ -350,9 +349,6 @@ function AllocatorPage() {
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {row.ltp ? formatINR(row.ltp) : <span className="text-slate-600">—</span>}
-                          </td>
-                          <td className="px-3 py-3.5 text-right font-mono text-xs">
-                            <span className="text-blue-500 dark:text-blue-400">{formatINR(row.allocatedBudget || 0)}</span>
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {formatINR(row.total || 0)}
