@@ -180,7 +180,7 @@ function AllocatorPage() {
         <div className="flex flex-col lg:flex-row gap-6">
 
           {/* Left — Search + Table */}
-          <div className="flex-1 lg:w-3/5 space-y-4">
+          <div className="flex-1 lg:w-[70%] space-y-4">
 
             {/* Search card */}
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
@@ -372,7 +372,7 @@ function AllocatorPage() {
           </div>
 
           {/* Right — Summary panel */}
-          <div className="lg:w-2/5">
+          <div className="lg:w-[30%]">
             <div className="sticky top-24 space-y-4">
 
               {/* Budget input */}
