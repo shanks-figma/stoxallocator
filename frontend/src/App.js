@@ -257,6 +257,15 @@ function AllocatorPage() {
                     <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />
                     Refresh
                   </button>
+                  <button
+                    onClick={() => { if (window.confirm("Clear all stocks from portfolio?")) setPortfolio([]); }}
+                    disabled={portfolio.length === 0}
+                    className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Reset portfolio"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Reset
+                  </button>
                 </div>
               </div>
 
