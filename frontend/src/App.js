@@ -339,13 +339,27 @@ function AllocatorPage() {
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              value={row.qty}
-                              onChange={(e) => updateQty(row.instrument_key, e.target.value)}
-                              className="h-8 w-16 text-center text-sm bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
+                            <div className="inline-flex items-center border border-gray-200 dark:border-slate-700 rounded-md overflow-hidden">
+                              <button
+                                onClick={() => updateQty(row.instrument_key, Math.max(0, Number(row.qty) - 1))}
+                                className="h-8 w-7 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-colors text-base font-medium"
+                              >−</button>
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.qty}
+                                onChange={(e) => updateQty(row.instrument_key, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "ArrowUp") { e.preventDefault(); updateQty(row.instrument_key, Number(row.qty) + 1); }
+                                  if (e.key === "ArrowDown") { e.preventDefault(); updateQty(row.instrument_key, Math.max(0, Number(row.qty) - 1)); }
+                                }}
+                                className="h-8 w-14 text-center text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                onClick={() => updateQty(row.instrument_key, Number(row.qty) + 1)}
+                                className="h-8 w-7 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-colors text-base font-medium"
+                              >+</button>
+                            </div>
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {row.ltp ? formatINR(row.ltp) : <span className="text-slate-600">—</span>}
