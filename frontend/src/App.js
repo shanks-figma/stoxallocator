@@ -297,21 +297,13 @@ function AllocatorPage() {
                       {portfolioWithLTP.map((row, index) => (
                         <tr key={row.instrument_key} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
                           <td className="px-3 py-3.5 text-center">
-                            <div className="flex flex-col items-center gap-0.5 group">
-                              <button
-                                onClick={() => moveUp(index)}
-                                disabled={index === 0}
-                                className="h-5 w-5 flex items-center justify-center rounded text-gray-300 dark:text-slate-600 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-0 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <ChevronUp className="h-3.5 w-3.5" />
+                            <div className="flex flex-col items-center gap-1 group">
+                              <button onClick={() => moveUp(index)} disabled={index === 0} className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 transition-opacity">
+                                <ChevronUp className="h-3 w-3 text-gray-400 dark:text-slate-500" />
                               </button>
-                              <GripVertical className="h-4 w-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-400 dark:group-hover:text-slate-500 transition-colors" />
-                              <button
-                                onClick={() => moveDown(index)}
-                                disabled={index === portfolio.length - 1}
-                                className="h-5 w-5 flex items-center justify-center rounded text-gray-300 dark:text-slate-600 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-0 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <ChevronDown className="h-3.5 w-3.5" />
+                              <GripVertical className="h-4 w-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-400 dark:group-hover:text-slate-500 transition-colors cursor-grab" />
+                              <button onClick={() => moveDown(index)} disabled={index === portfolio.length - 1} className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 transition-opacity">
+                                <ChevronDown className="h-3 w-3 text-gray-400 dark:text-slate-500" />
                               </button>
                             </div>
                           </td>
