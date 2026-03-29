@@ -301,7 +301,7 @@ async def upstox_headless_login() -> str:
             params={"response_type": "code", "client_id": api_key, "redirect_uri": redirect_uri},
         )
         final_params = parse_qs(urlparse(str(r1.url)).query)
-        user_id = (final_params.get("userId") or final_params.get("userid") or [None])[0]
+        user_id = (final_params.get("user_id") or final_params.get("userId") or final_params.get("userid") or [None])[0]
         if not user_id:
             raise RuntimeError(f"Could not extract userId from auth dialog redirect: {r1.url}")
         logger.info(f"Auto-login step 1 (userId) ✓ — {user_id}")
