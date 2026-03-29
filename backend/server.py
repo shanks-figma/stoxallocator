@@ -15,6 +15,7 @@ import gzip
 import json
 import re
 import asyncio
+import bisect
 import base64
 import random
 import string
@@ -148,6 +149,9 @@ def _validate_instrument_key(key: str) -> bool:
 # In-memory cache for instruments
 _instruments_cache: Dict[str, List[Instrument]] = {}
 _instruments_updated_at: Dict[str, datetime] = {}
+# Pre-built EQ-only index: sorted by tradingsymbol.upper() for fast bisect prefix search
+_instruments_eq_sorted: Dict[str, List[Instrument]] = {}
+_instruments_eq_syms: Dict[str, List[str]] = {}  # parallel uppercase symbol list for bisect
 
 async def _download_instruments(exchange: str = "complete") -> List[Instrument]:
     url = INSTRUMENTS_URLS.get(exchange, INSTRUMENTS_URLS["complete"])
@@ -164,6 +168,11 @@ async def _download_instruments(exchange: str = "complete") -> List[Instrument]:
                 continue
         _instruments_cache[exchange] = instruments
         _instruments_updated_at[exchange] = datetime.now(timezone.utc)
+        # Build sorted EQ index for fast binary-search prefix lookup
+        eq = [i for i in instruments if i.instrument_type == "EQ"]
+        eq.sort(key=lambda i: (i.tradingsymbol or "").upper())
+        _instruments_eq_sorted[exchange] = eq
+        _instruments_eq_syms[exchange] = [(i.tradingsymbol or "").upper() for i in eq]
         return instruments
 
 async def _get_instruments(exchange: str = "complete") -> List[Instrument]:
@@ -527,37 +536,68 @@ async def _upstox_headers() -> Dict[str, str]:
 @api_router.get("/instruments/search")
 async def search_instruments(query: str = Query(..., min_length=2), exchange: Optional[str] = Query(None, pattern=r"^(NSE|BSE)$"), instrument_type: Optional[str] = None, limit: int = Query(50, ge=1, le=200)):
     ex_key = exchange if exchange else "complete"
-    instruments = await _get_instruments(ex_key)
+    await _get_instruments(ex_key)  # ensure cache is warm
     uq = query.upper()
-    results: List[Instrument] = []
-    exact_matches = []  # Trading symbol exact matches (highest priority)
-    prefix_matches = []  # Trading symbol prefix matches
-    other_matches = []   # Name matches
 
+    # Fast path: EQ search uses pre-sorted index + bisect (O(log n) prefix, O(k) results)
+    if instrument_type == "EQ" and ex_key in _instruments_eq_syms:
+        syms = _instruments_eq_syms[ex_key]
+        eq_list = _instruments_eq_sorted[ex_key]
+        exact_matches = []
+        prefix_matches = []
+        substr_matches = []
+        name_matches = []
+
+        # Binary search for the start of prefix range
+        lo = bisect.bisect_left(syms, uq)
+        hi = bisect.bisect_left(syms, uq[:-1] + chr(ord(uq[-1]) + 1)) if uq else len(syms)
+
+        seen: set = set()
+        for i in range(lo, min(hi, len(syms))):
+            inst = eq_list[i]
+            sym = syms[i]
+            if sym == uq:
+                exact_matches.append(inst)
+            else:
+                prefix_matches.append(inst)
+            seen.add(i)
+            if len(exact_matches) + len(prefix_matches) >= limit:
+                break
+
+        # If we still need more results, scan for substring/name matches
+        if len(exact_matches) + len(prefix_matches) < limit:
+            for i, inst in enumerate(eq_list):
+                if i in seen:
+                    continue
+                sym = syms[i]
+                nm = (inst.name or "").upper()
+                if uq in sym:
+                    substr_matches.append(inst)
+                elif uq in nm:
+                    name_matches.append(inst)
+
+        results = (exact_matches + prefix_matches + substr_matches + name_matches)[:limit]
+        return {"status": "success", "count": len(results), "data": [r.dict() for r in results]}
+
+    # Generic path: full scan (for non-EQ or missing index)
+    instruments = _instruments_cache.get(ex_key, [])
+    exact_matches = []
+    prefix_matches = []
+    other_matches = []
     for inst in instruments:
         sym = (inst.tradingsymbol or "").upper()
         nm = (inst.name or "").upper()
-
-        if instrument_type and (inst.instrument_type != instrument_type):
+        if instrument_type and inst.instrument_type != instrument_type:
             continue
-
-        # Priority 1: Exact symbol match (e.g., "TCS" matches "TCS" exactly)
         if sym == uq:
             exact_matches.append(inst)
-        # Priority 2: Symbol starts with query (e.g., "REL" matches "RELIANCE")
         elif sym.startswith(uq):
             prefix_matches.append(inst)
-        # Priority 3: Symbol contains query (e.g., "LI" matches "RELIANCE")
         elif uq in sym:
             prefix_matches.append(inst)
-        # Priority 4: Name contains query (e.g., "RELIANCE INDUSTRIES")
         elif uq in nm:
             other_matches.append(inst)
-
-    # Combine results in priority order
-    results = exact_matches + prefix_matches + other_matches
-    results = results[:limit]
-
+    results = (exact_matches + prefix_matches + other_matches)[:limit]
     return {"status": "success", "count": len(results), "data": [r.dict() for r in results]}
 
 class QuotePayload(BaseModel):
