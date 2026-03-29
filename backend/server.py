@@ -300,10 +300,20 @@ async def upstox_headless_login() -> str:
             UPSTOX_AUTH_URL,
             params={"response_type": "code", "client_id": api_key, "redirect_uri": redirect_uri},
         )
-        final_params = parse_qs(urlparse(str(r1.url)).query)
-        user_id = (final_params.get("user_id") or final_params.get("userId") or final_params.get("userid") or [None])[0]
+        final_url = str(r1.url)
+        # Try regex first (handles any casing / encoding)
+        m = re.search(r'[?&]user_id=([^&]+)', final_url, re.IGNORECASE)
+        user_id = m.group(1) if m else None
+        # Fallback: parse_qs
         if not user_id:
-            raise RuntimeError(f"Could not extract userId from auth dialog redirect: {r1.url}")
+            final_params = parse_qs(urlparse(final_url).query)
+            user_id = (
+                final_params.get("user_id") or
+                final_params.get("userId") or
+                final_params.get("userid") or [None]
+            )[0]
+        if not user_id:
+            raise RuntimeError(f"Could not extract userId from auth dialog redirect: {final_url}")
         logger.info(f"Auto-login step 1 (userId) ✓ — {user_id}")
 
         # ── Step 2: generate OTP/TOTP request ──────────────────────────────
