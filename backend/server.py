@@ -346,7 +346,7 @@ async def upstox_headless_login() -> str:
             f"{UPSTOX_SERVICE_URL}/login/open/v3/auth/2fa",
             params={
                 "client_id": api_key,
-                "redirect_uri": "https://api-v2.upstox.com/login/authorization/redirect",
+                "redirect_uri": redirect_uri,
             },
             json={"data": {"twoFAMethod": "SECRET_PIN", "inputText": pin_b64}},
             headers=_browser_headers(),
@@ -360,7 +360,7 @@ async def upstox_headless_login() -> str:
             f"{UPSTOX_SERVICE_URL}/login/v2/oauth/authorize",
             params={
                 "client_id": api_key,
-                "redirect_uri": "https://api-v2.upstox.com/login/authorization/redirect",
+                "redirect_uri": redirect_uri,
                 "requestId": _request_id(),
                 "response_type": "code",
             },
