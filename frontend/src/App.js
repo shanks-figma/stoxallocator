@@ -8,7 +8,7 @@ import { Input } from "./components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, ChevronUp, ChevronDown, Sun, Moon, Zap } from "lucide-react";
+import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, ChevronUp, ChevronDown, Sun, Moon, Zap, GripVertical, ArrowRight, PieChart, Activity } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API_BASE = `${BACKEND_URL}/api`;
@@ -30,7 +30,7 @@ function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
       <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link to="/app" className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
             <TrendingUp className="h-4 w-4 text-white" />
           </div>
@@ -39,26 +39,28 @@ function Navbar() {
 
         {/* Nav links + theme toggle */}
         <nav className="flex items-center gap-1">
-          <Link to="/">
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
+          <Link to="/app">
+            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/app") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
               <Wallet className="h-4 w-4" /> Allocator
             </button>
           </Link>
-          <Link to="/order">
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/order") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
-              <ChevronRight className="h-4 w-4" /> Order (Exp)
-            </button>
-          </Link>
-          <Link to="/buckets">
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/buckets") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
-              <BarChart2 className="h-4 w-4" /> Buckets
-            </button>
-          </Link>
-          <Link to="/admin">
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/admin") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
-              <Shield className="h-4 w-4" /> Admin
-            </button>
-          </Link>
+          {!isActive("/app") && <>
+            <Link to="/order">
+              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/order") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
+                <ChevronRight className="h-4 w-4" /> Order (Exp)
+              </button>
+            </Link>
+            <Link to="/buckets">
+              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/buckets") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
+                <BarChart2 className="h-4 w-4" /> Buckets
+              </button>
+            </Link>
+            <Link to="/admin">
+              <button className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/admin") ? "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white" : "text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800/50"}`}>
+                <Shield className="h-4 w-4" /> Admin
+              </button>
+            </Link>
+          </>}
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className="ml-2 p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all"
@@ -82,10 +84,11 @@ function AllocatorPage() {
   const [prices, setPrices] = useState({});
   const [polling, setPolling] = useState(false);
   const api = useMemo(() => axios.create({ baseURL: API_BASE }), []);
+  const searchCache = useRef(new Map());
 
-  useEffect(() => { let active = true; const fetchResults = async () => { if (!query || query.length < 2) { setResults([]); return; } setSearching(true); try { const { data } = await api.get("/instruments/search", { params: { query, exchange, instrument_type: "EQ", limit: 10 } }); if (active) setResults(data.data || []); } catch (e) { console.error(e); } finally { setSearching(false); } }; const t = setTimeout(fetchResults, 300); return () => { active = false; clearTimeout(t); }; }, [query, exchange, api]);
+  useEffect(() => { let active = true; const fetchResults = async () => { if (!query || query.length < 2) { setResults([]); return; } const cacheKey = `${query}|${exchange}`; if (searchCache.current.has(cacheKey)) { setResults(searchCache.current.get(cacheKey)); setSearching(false); } else { setSearching(true); } try { const { data } = await api.get("/instruments/search", { params: { query, exchange, instrument_type: "EQ", limit: 10 } }); const res = data.data || []; searchCache.current.set(cacheKey, res); if (active) setResults(res); } catch (e) { console.error(e); } finally { if (active) setSearching(false); } }; const t = setTimeout(fetchResults, 150); return () => { active = false; clearTimeout(t); }; }, [query, exchange, api]);
 
-  useEffect(() => { let timerId; const poll = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("LTP poll error", e?.response?.data || e.message); } }; poll(); timerId = setInterval(poll, 30000); setPolling(true); return () => { clearInterval(timerId); setPolling(false); }; }, [portfolio, api]);
+  useEffect(() => { let timerId; const poll = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("LTP poll error", e?.response?.data || e.message); } }; poll(); timerId = setInterval(poll, 15000); setPolling(true); return () => { clearInterval(timerId); setPolling(false); }; }, [portfolio, api]);
 
   const portfolioWithLTP = useMemo(() => {
     const n = portfolio.length;
@@ -118,18 +121,52 @@ function AllocatorPage() {
     if (eligible.length === 0) return;
     const n = eligible.length;
     const totalWeight = n * (n + 1) / 2;
-    setPortfolio(prev => {
-      let eligibleIndex = 0;
-      return prev.map(item => {
-        const live = eligible.find(e => e.instrument_key === item.instrument_key);
-        if (!live) return item;
-        const weight = n - eligibleIndex;
-        eligibleIndex++;
-        const allocatedBudget = (weight / totalWeight) * (Number(budget) || 0);
-        const qty = Math.floor(allocatedBudget / live.ltp);
-        return { ...item, qty: Math.max(0, qty) };
-      });
-    });
+    const totalBudget = Number(budget) || 0;
+
+    // Step 1: initial weighted allocation using Math.floor
+    const qtys = {};
+    let eligibleIndex = 0;
+    for (const item of eligible) {
+      const weight = n - eligibleIndex;
+      eligibleIndex++;
+      const allocatedBudget = (weight / totalWeight) * totalBudget;
+      qtys[item.instrument_key] = Math.max(0, Math.floor(allocatedBudget / item.ltp));
+    }
+
+    // Step 2: greedily fill remaining with the cheapest stock (incl. charges) until nothing fits
+    const computeSpent = () => eligible.reduce((s, item) => {
+      const qty = qtys[item.instrument_key];
+      const total = qty * item.ltp;
+      return s + total + computeAdditionalCost(total, exchange);
+    }, 0);
+
+    let remaining = totalBudget - computeSpent();
+    const sortedByPrice = [...eligible].sort((a, b) => a.ltp - b.ltp);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const item of sortedByPrice) {
+        const curQty = qtys[item.instrument_key];
+        const oldTotal = curQty * item.ltp;
+        const newTotal = (curQty + 1) * item.ltp;
+        const marginalCost = item.ltp
+          + computeAdditionalCost(newTotal, exchange)
+          - computeAdditionalCost(oldTotal, exchange);
+        if (marginalCost <= remaining) {
+          qtys[item.instrument_key] += 1;
+          remaining -= marginalCost;
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    setPortfolio(prev => prev.map(item => {
+      if (qtys[item.instrument_key] !== undefined) {
+        return { ...item, qty: qtys[item.instrument_key] };
+      }
+      return item;
+    }));
   };
   const refreshOnce = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("Manual refresh error", e?.response?.data || e.message); } };
 
@@ -146,7 +183,7 @@ function AllocatorPage() {
         <div className="flex flex-col lg:flex-row gap-6">
 
           {/* Left — Search + Table */}
-          <div className="flex-1 lg:w-3/5 space-y-4">
+          <div className="flex-1 lg:w-[70%] space-y-4">
 
             {/* Search card */}
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
@@ -162,14 +199,17 @@ function AllocatorPage() {
                     className="w-full h-11 pl-10 pr-4 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   />
                 </div>
-                <select
-                  value={exchange}
-                  onChange={(e) => setExchange(e.target.value)}
-                  className="h-11 w-28 px-3 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="NSE">NSE</option>
-                  <option value="BSE">BSE</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={exchange}
+                    onChange={(e) => setExchange(e.target.value)}
+                    className="h-11 w-28 pl-3 pr-8 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none cursor-pointer"
+                  >
+                    <option value="NSE">NSE</option>
+                    <option value="BSE">BSE</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-400 pointer-events-none" />
+                </div>
               </div>
 
               {/* Search results dropdown */}
@@ -216,12 +256,13 @@ function AllocatorPage() {
                     <Zap className="h-3.5 w-3.5" /> Auto-Allocate
                   </button>
                   <button
-                    onClick={refreshOnce}
+                    onClick={() => { if (window.confirm("Clear all stocks from portfolio?")) setPortfolio([]); }}
                     disabled={portfolio.length === 0}
-                    className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Reset portfolio"
                   >
-                    <RefreshCw className={`h-3.5 w-3.5 ${polling ? "animate-spin" : ""}`} />
-                    Refresh
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Reset
                   </button>
                 </div>
               </div>
@@ -239,20 +280,10 @@ function AllocatorPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
-                        <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium px-5 py-3">Stock</th>
-                        <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger className="cursor-help underline decoration-dotted">Order</TooltipTrigger>
-                              <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200 text-xs max-w-xs">
-                                Top stock gets the most budget. Use ▲▼ to reorder. Click Auto-Allocate to distribute.
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </th>
+                        <th className="w-10 px-3 py-3"></th>
+                        <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium pr-3 pl-0 py-3">Stock</th>
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
-                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Allocated</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
                           <TooltipProvider>
@@ -271,45 +302,46 @@ function AllocatorPage() {
                     <tbody className="divide-y divide-gray-200 dark:divide-slate-800/60">
                       {portfolioWithLTP.map((row, index) => (
                         <tr key={row.instrument_key} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
-                          <td className="px-5 py-3.5">
+                          <td className="px-3 py-3.5 text-center">
+                            <div className="flex flex-col items-center gap-1 group">
+                              <button onClick={() => moveUp(index)} disabled={index === 0} className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 transition-opacity">
+                                <ChevronUp className="h-3 w-3 text-gray-400 dark:text-slate-500" />
+                              </button>
+                              <GripVertical className="h-4 w-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-400 dark:group-hover:text-slate-500 transition-colors cursor-grab" />
+                              <button onClick={() => moveDown(index)} disabled={index === portfolio.length - 1} className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 transition-opacity">
+                                <ChevronDown className="h-3 w-3 text-gray-400 dark:text-slate-500" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="pr-3 pl-0 py-3.5">
                             <div className="font-semibold text-gray-900 dark:text-white">{row.tradingsymbol || row.name}</div>
                             <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="text-xs font-semibold text-emerald-500 w-6">#{index + 1}</span>
-                              <div className="flex flex-col gap-0.5">
-                                <button
-                                  onClick={() => moveUp(index)}
-                                  disabled={index === 0}
-                                  className="h-5 w-5 flex items-center justify-center rounded text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  <ChevronUp className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => moveDown(index)}
-                                  disabled={index === portfolio.length - 1}
-                                  className="h-5 w-5 flex items-center justify-center rounded text-gray-400 dark:text-slate-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  <ChevronDown className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
+                            <div className="inline-flex items-center border border-gray-200 dark:border-slate-700 rounded-md overflow-hidden">
+                              <button
+                                onClick={() => updateQty(row.instrument_key, Math.max(0, Number(row.qty) - 1))}
+                                className="h-8 w-7 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-colors text-base font-medium"
+                              >−</button>
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.qty}
+                                onChange={(e) => updateQty(row.instrument_key, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "ArrowUp") { e.preventDefault(); updateQty(row.instrument_key, Number(row.qty) + 1); }
+                                  if (e.key === "ArrowDown") { e.preventDefault(); updateQty(row.instrument_key, Math.max(0, Number(row.qty) - 1)); }
+                                }}
+                                className="h-8 w-14 text-center text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                onClick={() => updateQty(row.instrument_key, Number(row.qty) + 1)}
+                                className="h-8 w-7 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-colors text-base font-medium"
+                              >+</button>
                             </div>
-                          </td>
-                          <td className="px-3 py-3.5 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              value={row.qty}
-                              onChange={(e) => updateQty(row.instrument_key, e.target.value)}
-                              className="h-8 w-16 text-center text-sm bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            />
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {row.ltp ? formatINR(row.ltp) : <span className="text-slate-600">—</span>}
-                          </td>
-                          <td className="px-3 py-3.5 text-right font-mono text-xs">
-                            <span className="text-blue-500 dark:text-blue-400">{formatINR(row.allocatedBudget || 0)}</span>
                           </td>
                           <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">
                             {formatINR(row.total || 0)}
@@ -338,7 +370,7 @@ function AllocatorPage() {
           </div>
 
           {/* Right — Summary panel */}
-          <div className="lg:w-2/5">
+          <div className="lg:w-[30%]">
             <div className="sticky top-24 space-y-4">
 
               {/* Budget input */}
@@ -406,6 +438,283 @@ function AllocatorPage() {
                 )}
               </div>
 
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AllocatorPage2() {
+  const [budget, setBudget] = useLocalStorageState("stox_budget_2", 100000);
+  const [query, setQuery] = useState("");
+  const [exchange, setExchange] = useState("NSE");
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState([]);
+  const [portfolio, setPortfolio] = useLocalStorageState("stox_portfolio_2", []);
+  const [prices, setPrices] = useState({});
+  const [polling, setPolling] = useState(false);
+  const api = useMemo(() => axios.create({ baseURL: API_BASE }), []);
+  const searchCache = useRef(new Map());
+
+  useEffect(() => { let active = true; const fetchResults = async () => { if (!query || query.length < 2) { setResults([]); return; } const cacheKey = `${query}|${exchange}`; if (searchCache.current.has(cacheKey)) { setResults(searchCache.current.get(cacheKey)); setSearching(false); } else { setSearching(true); } try { const { data } = await api.get("/instruments/search", { params: { query, exchange, instrument_type: "EQ", limit: 10 } }); const res = data.data || []; searchCache.current.set(cacheKey, res); if (active) setResults(res); } catch (e) { console.error(e); } finally { if (active) setSearching(false); } }; const t = setTimeout(fetchResults, 150); return () => { active = false; clearTimeout(t); }; }, [query, exchange, api]);
+
+  useEffect(() => { let timerId; const poll = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("LTP poll error", e?.response?.data || e.message); } }; poll(); timerId = setInterval(poll, 30000); setPolling(true); return () => { clearInterval(timerId); setPolling(false); }; }, [portfolio, api]);
+
+  const portfolioWithLTP = useMemo(() => {
+    const n = portfolio.length;
+    const totalWeight = n * (n + 1) / 2;
+    return portfolio.map((item, index) => {
+      const quote = prices[item.instrument_key];
+      const ltp = quote?.last_price ?? item.last_price ?? null;
+      const qty = Number(item.qty) || 0;
+      const total = ltp ? ltp * qty : 0;
+      const additional = total ? computeAdditionalCost(total, exchange) : 0;
+      const finalCost = total + additional;
+      const weight = n - index;
+      const allocatedBudget = totalWeight > 0 ? (weight / totalWeight) * (Number(budget) || 0) : 0;
+      return { ...item, ltp, total, additional, finalCost, allocatedBudget };
+    });
+  }, [portfolio, prices, exchange, budget]);
+
+  const portfolioValue = useMemo(() => portfolioWithLTP.reduce((s, i) => s + (i.total || 0), 0), [portfolioWithLTP]);
+  const finalCostTotal = useMemo(() => portfolioWithLTP.reduce((s, i) => s + (i.finalCost || 0), 0), [portfolioWithLTP]);
+  const remaining = useMemo(() => (Number(budget) || 0) - finalCostTotal, [budget, finalCostTotal]);
+  const progressPct = budget > 0 ? Math.min((finalCostTotal / budget) * 100, 100) : 0;
+
+  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
+  const removeFromPortfolio = (instrument_key) => { setPortfolio(prev => prev.filter(p => p.instrument_key !== instrument_key)); };
+  const updateQty = (instrument_key, qty) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, qty: Math.max(0, Number(qty) || 0) } : p)); };
+  const moveUp = (index) => { if (index === 0) return; setPortfolio(prev => { const next = [...prev]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; }); };
+  const moveDown = (index) => { setPortfolio(prev => { if (index === prev.length - 1) return prev; const next = [...prev]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; }); };
+  const autoAllocate = () => {
+    const eligible = portfolioWithLTP.filter(item => item.ltp > 0);
+    if (eligible.length === 0) return;
+    const n = eligible.length;
+    const totalWeight = n * (n + 1) / 2;
+    const totalBudget = Number(budget) || 0;
+    const qtys = {};
+    let eligibleIndex = 0;
+    for (const item of eligible) {
+      const weight = n - eligibleIndex;
+      eligibleIndex++;
+      const allocatedBudget = (weight / totalWeight) * totalBudget;
+      qtys[item.instrument_key] = Math.max(0, Math.floor(allocatedBudget / item.ltp));
+    }
+    const computeSpent = () => eligible.reduce((s, item) => {
+      const qty = qtys[item.instrument_key];
+      const total = qty * item.ltp;
+      return s + total + computeAdditionalCost(total, exchange);
+    }, 0);
+    let remaining = totalBudget - computeSpent();
+    const sortedByPrice = [...eligible].sort((a, b) => a.ltp - b.ltp);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const item of sortedByPrice) {
+        const curQty = qtys[item.instrument_key];
+        const oldTotal = curQty * item.ltp;
+        const newTotal = (curQty + 1) * item.ltp;
+        const marginalCost = item.ltp + computeAdditionalCost(newTotal, exchange) - computeAdditionalCost(oldTotal, exchange);
+        if (marginalCost <= remaining) {
+          qtys[item.instrument_key] += 1;
+          remaining -= marginalCost;
+          changed = true;
+          break;
+        }
+      }
+    }
+    setPortfolio(prev => prev.map(item => {
+      if (qtys[item.instrument_key] !== undefined) return { ...item, qty: qtys[item.instrument_key] };
+      return item;
+    }));
+  };
+  const refreshOnce = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("Manual refresh error", e?.response?.data || e.message); } };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pt-16">
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Allocation Calculator</h1>
+          <p className="text-gray-500 dark:text-gray-500 dark:text-slate-400 text-sm mt-1">Build your portfolio and estimate total investment cost</p>
+        </div>
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1 lg:w-[70%] space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or symbol — RELIANCE, TCS, Infosys…" className="w-full h-11 pl-10 pr-4 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+                <div className="relative">
+                  <select value={exchange} onChange={(e) => setExchange(e.target.value)} className="h-11 w-28 pl-3 pr-8 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none cursor-pointer">
+                    <option value="NSE">NSE</option>
+                    <option value="BSE">BSE</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+              {searching && <div className="mt-3 text-sm text-slate-500">Searching…</div>}
+              {results.length > 0 && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {results.map((r) => (
+                    <div key={r.instrument_key} onClick={() => addToPortfolio(r)} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 hover:border-emerald-500/40 rounded-lg cursor-pointer transition-all group">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">{r.tradingsymbol || r.name}</div>
+                        <div className="text-xs text-slate-400 truncate max-w-[160px]">{r.name}</div>
+                      </div>
+                      <div className="h-7 w-7 rounded-full bg-slate-700 group-hover:bg-emerald-500 flex items-center justify-center transition-colors">
+                        <Plus className="h-3.5 w-3.5 text-slate-400 group-hover:text-white" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Stock Portfolio</h2>
+                  {portfolio.length > 0 && (
+                    <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">{portfolio.length} stocks</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={autoAllocate} disabled={portfolio.length === 0} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-medium" title="Auto-distribute budget by priority">
+                    <Zap className="h-3.5 w-3.5" /> Auto-Allocate
+                  </button>
+                  <button onClick={() => { if (window.confirm("Clear all stocks from portfolio?")) setPortfolio([]); }} disabled={portfolio.length === 0} className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="Reset portfolio">
+                    <Trash2 className="h-3.5 w-3.5" /> Reset
+                  </button>
+                </div>
+              </div>
+              {portfolio.length === 0 ? (
+                <div className="py-16 text-center">
+                  <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                    <TrendingUp className="h-6 w-6 text-slate-600" />
+                  </div>
+                  <div className="text-gray-500 dark:text-slate-400 text-sm font-medium">No stocks added yet</div>
+                  <div className="text-slate-600 text-xs mt-1">Search above to add stocks to your portfolio</div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
+                        <th className="w-10 px-3 py-3"></th>
+                        <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium pr-3 pl-0 py-3">Stock</th>
+                        <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
+                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
+                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
+                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger className="cursor-help underline decoration-dotted">Charges</TooltipTrigger>
+                              <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200 text-xs max-w-xs">
+                                STT, exchange, stamp (Chandigarh UT), SEBI, GST + ₹20 delivery fee
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </th>
+                        <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-5 py-3">Total</th>
+                        <th className="px-3 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-slate-800/60">
+                      {portfolioWithLTP.map((row, index) => (
+                        <tr key={row.instrument_key} className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="px-3 py-3.5 text-center">
+                            <div className="flex flex-col items-center gap-1 group">
+                              <button onClick={() => moveUp(index)} disabled={index === 0} className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 transition-opacity">
+                                <ChevronUp className="h-3 w-3 text-gray-400 dark:text-slate-500" />
+                              </button>
+                              <GripVertical className="h-4 w-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-400 dark:group-hover:text-slate-500 transition-colors cursor-grab" />
+                              <button onClick={() => moveDown(index)} disabled={index === portfolio.length - 1} className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 transition-opacity">
+                                <ChevronDown className="h-3 w-3 text-gray-400 dark:text-slate-500" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="pr-3 pl-0 py-3.5">
+                            <div className="font-semibold text-gray-900 dark:text-white">{row.tradingsymbol || row.name}</div>
+                            <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            <div className="inline-flex items-center border border-gray-200 dark:border-slate-700 rounded-md overflow-hidden">
+                              <button onClick={() => updateQty(row.instrument_key, Math.max(0, Number(row.qty) - 1))} className="h-8 w-7 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-colors text-base font-medium">−</button>
+                              <input type="number" min="0" value={row.qty} onChange={(e) => updateQty(row.instrument_key, e.target.value)} onKeyDown={(e) => { if (e.key === "ArrowUp") { e.preventDefault(); updateQty(row.instrument_key, Number(row.qty) + 1); } if (e.key === "ArrowDown") { e.preventDefault(); updateQty(row.instrument_key, Math.max(0, Number(row.qty) - 1)); } }} className="h-8 w-14 text-center text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-inset focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                              <button onClick={() => updateQty(row.instrument_key, Number(row.qty) + 1)} className="h-8 w-7 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white transition-colors text-base font-medium">+</button>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">{row.ltp ? formatINR(row.ltp) : <span className="text-slate-600">—</span>}</td>
+                          <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">{formatINR(row.total || 0)}</td>
+                          <td className="px-3 py-3.5 text-right text-gray-700 dark:text-slate-300 font-mono text-xs">{formatINR(row.additional || 0)}</td>
+                          <td className="px-5 py-3.5 text-right font-semibold text-emerald-400 font-mono text-xs">{formatINR(row.finalCost || 0)}</td>
+                          <td className="px-3 py-3.5">
+                            <button onClick={() => removeFromPortfolio(row.instrument_key)} className="h-7 w-7 rounded-md flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="lg:w-[30%]">
+            <div className="sticky top-24 space-y-4">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
+                <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Total Budget</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                    <span className="text-slate-400 text-lg font-medium">₹</span>
+                  </div>
+                  <input type="number" value={budget} onChange={(e) => setBudget(Number(e.target.value))} placeholder="Enter budget" className="w-full h-14 pl-9 pr-4 bg-slate-800 border border-slate-700 rounded-lg text-2xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+                <div className="text-center mt-3">
+                  <div className="text-3xl font-bold text-white">{formatINR(Number(budget) || 0)}</div>
+                  <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Available for investment</div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 divide-y divide-gray-200 dark:divide-slate-800">
+                <div className="flex justify-between items-center px-5 py-4">
+                  <span className="text-sm text-slate-400">Allocated</span>
+                  <span className="font-semibold text-gray-900 dark:text-white font-mono">{formatINR(Number(budget) || 0)}</span>
+                </div>
+                <div className="flex justify-between items-center px-5 py-4">
+                  <span className="text-sm text-slate-400">Invested (incl. charges)</span>
+                  <span className="font-semibold text-gray-900 dark:text-white font-mono">{formatINR(finalCostTotal)}</span>
+                </div>
+                <div className="flex justify-between items-center px-5 py-4">
+                  <span className="text-sm text-slate-400">Remaining</span>
+                  <span className={`font-bold text-lg font-mono ${remaining < 0 ? "text-red-400" : "text-emerald-400"}`}>{formatINR(remaining)}</span>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-5">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Investment Progress</span>
+                  <span className={`text-sm font-bold ${progressPct >= 100 ? "text-red-400" : "text-emerald-400"}`}>{Math.round(progressPct)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                  <div className={`h-2.5 rounded-full transition-all duration-500 ${remaining < 0 ? "bg-red-500" : "bg-gradient-to-r from-emerald-500 to-teal-400"}`} style={{ width: `${progressPct}%` }} />
+                </div>
+                {portfolio.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="bg-gray-100 dark:bg-gray-100 dark:bg-slate-800 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-white">{portfolio.length}</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Stocks</div>
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-100 dark:bg-slate-800 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-white">{formatINR(portfolio.length > 0 ? finalCostTotal / portfolio.length : 0).replace("₹", "₹")}</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Avg per stock</div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1191,16 +1500,165 @@ function OrderExperimentPage() {
 
 function useEditKey() { const [editKey, setEditKey] = useLocalStorageState("stox_edit_key", ""); return { editKey, setEditKey }; }
 
-function App() {
+function LandingPage() {
+  const { theme, setTheme } = useTheme();
   return (
-    <BrowserRouter>
+    <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col">
+      {/* Minimal top bar */}
+      <header className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+            <TrendingUp className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">Stox<span className="text-emerald-500 dark:text-emerald-400">Allocator</span></span>
+        </div>
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all"
+          title="Toggle theme"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-medium mb-8">
+          <Activity className="h-3 w-3" /> Live market prices via Upstox
+        </div>
+
+        {/* Headline */}
+        <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 dark:text-white leading-tight max-w-2xl mb-5">
+          Allocate your budget,<br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">smarter.</span>
+        </h1>
+
+        {/* Subtext */}
+        <p className="text-lg text-gray-500 dark:text-slate-400 max-w-lg mb-10">
+          Search stocks, set priorities, and auto-allocate your investment budget across your portfolio — with real-time prices and brokerage cost calculations.
+        </p>
+
+        {/* CTA */}
+        <Link to="/app">
+          <button className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-base transition-colors shadow-lg shadow-emerald-500/20">
+            Open Allocator <ArrowRight className="h-4 w-4" />
+          </button>
+        </Link>
+
+        {/* Feature pills */}
+        <div className="flex flex-wrap justify-center gap-3 mt-14">
+          {[
+            { icon: <Zap className="h-3.5 w-3.5" />, label: "Priority-based auto-allocation" },
+            { icon: <PieChart className="h-3.5 w-3.5" />, label: "Brokerage & charges included" },
+            { icon: <TrendingUp className="h-3.5 w-3.5" />, label: "Live LTP every 30s" },
+            { icon: <Wallet className="h-3.5 w-3.5" />, label: "Budget tracking" },
+          ].map(({ icon, label }) => (
+            <div key={label} className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 text-sm">
+              <span className="text-emerald-500">{icon}</span>{label}
+            </div>
+          ))}
+        </div>
+      </main>
+
+      <footer className="py-6 text-center text-xs text-gray-400 dark:text-slate-600">
+        Built for Indian equity markets · NSE &amp; BSE
+      </footer>
+    </div>
+  );
+}
+
+function LandingPage2() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col">
+      {/* Minimal top bar */}
+      <header className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+            <TrendingUp className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">Stox<span className="text-emerald-500 dark:text-emerald-400">Allocator</span></span>
+        </div>
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all"
+          title="Toggle theme"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-medium mb-8">
+          <Activity className="h-3 w-3" /> Live market prices via Upstox
+        </div>
+
+        {/* Headline */}
+        <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 dark:text-white leading-tight max-w-2xl mb-5">
+          Allocate your budget,<br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">smarter.</span>
+        </h1>
+
+        {/* Subtext */}
+        <p className="text-lg text-gray-500 dark:text-slate-400 max-w-lg mb-10">
+          Search stocks, set priorities, and auto-allocate your investment budget across your portfolio — with real-time prices and brokerage cost calculations.
+        </p>
+
+        {/* CTA */}
+        <Link to="/app">
+          <button className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-base transition-colors shadow-lg shadow-emerald-500/20">
+            Open Allocator <ArrowRight className="h-4 w-4" />
+          </button>
+        </Link>
+
+        {/* Feature pills */}
+        <div className="flex flex-wrap justify-center gap-3 mt-14">
+          {[
+            { icon: <Zap className="h-3.5 w-3.5" />, label: "Priority-based auto-allocation" },
+            { icon: <PieChart className="h-3.5 w-3.5" />, label: "Brokerage & charges included" },
+            { icon: <TrendingUp className="h-3.5 w-3.5" />, label: "Live LTP every 30s" },
+            { icon: <Wallet className="h-3.5 w-3.5" />, label: "Budget tracking" },
+          ].map(({ icon, label }) => (
+            <div key={label} className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 text-sm">
+              <span className="text-emerald-500">{icon}</span>{label}
+            </div>
+          ))}
+        </div>
+      </main>
+
+      <footer className="py-6 text-center text-xs text-gray-400 dark:text-slate-600">
+        Built for Indian equity markets · NSE &amp; BSE
+      </footer>
+    </div>
+  );
+}
+
+function AppLayout() {
+  return (
+    <>
       <Navbar />
       <Routes>
-        <Route path="/" element={<AllocatorPage />} />
+        <Route path="/app" element={<AllocatorPage />} />
+        <Route path="/app-2" element={<AllocatorPage2 />} />
         <Route path="/order" element={<OrderExperimentPage />} />
         <Route path="/buckets" element={<BucketsPage />} />
         <Route path="/buckets/:id" element={<BucketDetailPage />} />
         <Route path="/admin" element={<AdminPage />} />
+      </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/landing-2" element={<LandingPage2 />} />
+        <Route path="/*" element={<AppLayout />} />
       </Routes>
     </BrowserRouter>
   );

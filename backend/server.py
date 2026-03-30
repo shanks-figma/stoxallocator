@@ -15,6 +15,11 @@ import gzip
 import json
 import re
 import asyncio
+import bisect
+import base64
+import random
+import string
+from urllib.parse import urlparse, parse_qs
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pyotp
@@ -144,6 +149,9 @@ def _validate_instrument_key(key: str) -> bool:
 # In-memory cache for instruments
 _instruments_cache: Dict[str, List[Instrument]] = {}
 _instruments_updated_at: Dict[str, datetime] = {}
+# Pre-built EQ-only index: sorted by tradingsymbol.upper() for fast bisect prefix search
+_instruments_eq_sorted: Dict[str, List[Instrument]] = {}
+_instruments_eq_syms: Dict[str, List[str]] = {}  # parallel uppercase symbol list for bisect
 
 async def _download_instruments(exchange: str = "complete") -> List[Instrument]:
     url = INSTRUMENTS_URLS.get(exchange, INSTRUMENTS_URLS["complete"])
@@ -160,6 +168,11 @@ async def _download_instruments(exchange: str = "complete") -> List[Instrument]:
                 continue
         _instruments_cache[exchange] = instruments
         _instruments_updated_at[exchange] = datetime.now(timezone.utc)
+        # Build sorted EQ index for fast binary-search prefix lookup
+        eq = [i for i in instruments if i.instrument_type == "EQ"]
+        eq.sort(key=lambda i: (i.tradingsymbol or "").upper())
+        _instruments_eq_sorted[exchange] = eq
+        _instruments_eq_syms[exchange] = [(i.tradingsymbol or "").upper() for i in eq]
         return instruments
 
 async def _get_instruments(exchange: str = "complete") -> List[Instrument]:
@@ -242,8 +255,155 @@ async def scheduler_status(x_admin_key: Optional[str] = Header(None)):
     }
 
 # ===== OAuth: Upstox Login Flow =====
-UPSTOX_AUTH_URL = "https://api.upstox.com/v2/login/authorization/dialog"
-UPSTOX_TOKEN_URL = "https://api.upstox.com/v2/login/authorization/token"
+UPSTOX_AUTH_URL    = "https://api.upstox.com/v2/login/authorization/dialog"
+UPSTOX_TOKEN_URL   = "https://api.upstox.com/v2/login/authorization/token"
+UPSTOX_SERVICE_URL = "https://service.upstox.com"
+
+
+def _request_id() -> str:
+    return "WPRO-" + "".join(random.choices(string.ascii_letters + string.digits, k=10))
+
+
+def _browser_headers() -> dict:
+    return {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "origin": "https://login.upstox.com",
+        "referer": "https://login.upstox.com/",
+        "user-agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "x-device-details": "platform=WEB|osName=Mac OS/10.15.7|osVersion=10.15.7|appName=chrome|appVersion=131.0.0.0",
+        "x-request-id": _request_id(),
+    }
+
+
+async def upstox_headless_login() -> str:
+    """
+    Fully automated Upstox login using mobile + PIN + TOTP.
+    Flow: auth-dialog → OTP generate → TOTP verify → PIN 2FA → OAuth authorize → token exchange
+    Returns a fresh access_token string on success.
+    Raises RuntimeError with a human-readable message on failure.
+    """
+    mobile       = os.environ.get("UPSTOX_MOBILE", "").strip()
+    pin          = os.environ.get("UPSTOX_PIN", "").strip()
+    totp_secret  = os.environ.get("UPSTOX_TOTP_SECRET", "").strip()
+    api_key      = os.environ.get("UPSTOX_API_KEY", "").strip()
+    api_secret   = os.environ.get("UPSTOX_API_SECRET", "").strip()
+    redirect_uri = os.environ.get("UPSTOX_REDIRECT_URI", "http://localhost:8001/api/auth/callback").strip()
+
+    missing = [k for k, v in [
+        ("UPSTOX_MOBILE", mobile), ("UPSTOX_PIN", pin),
+        ("UPSTOX_TOTP_SECRET", totp_secret), ("UPSTOX_API_KEY", api_key),
+        ("UPSTOX_API_SECRET", api_secret),
+    ] if not v or v.startswith("your_")]
+    if missing:
+        raise RuntimeError(f"Missing / placeholder .env values: {', '.join(missing)}")
+
+    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as session:
+
+        # ── Step 1: auth dialog → extract userId ───────────────────────────
+        r1 = await session.get(
+            UPSTOX_AUTH_URL,
+            params={"response_type": "code", "client_id": api_key, "redirect_uri": redirect_uri},
+        )
+        final_url = str(r1.url)
+        # Try regex first (handles any casing / encoding)
+        m = re.search(r'[?&]user_id=([^&]+)', final_url, re.IGNORECASE)
+        user_id = m.group(1) if m else None
+        # Fallback: parse_qs
+        if not user_id:
+            final_params = parse_qs(urlparse(final_url).query)
+            user_id = (
+                final_params.get("user_id") or
+                final_params.get("userId") or
+                final_params.get("userid") or [None]
+            )[0]
+        if not user_id:
+            raise RuntimeError(f"Could not extract userId from auth dialog redirect: {final_url}")
+        logger.info(f"Auto-login step 1 (userId) ✓ — {user_id}")
+
+        # ── Step 2: generate OTP/TOTP request ──────────────────────────────
+        r2 = await session.post(
+            f"{UPSTOX_SERVICE_URL}/login/open/v6/auth/1fa/otp/generate",
+            json={"data": {"mobileNumber": mobile, "userId": user_id}},
+            headers=_browser_headers(),
+        )
+        if r2.status_code != 200:
+            raise RuntimeError(f"OTP generate failed ({r2.status_code}): {r2.text}")
+        validate_otp_token = r2.json().get("data", {}).get("validateOTPToken", "")
+        if not validate_otp_token:
+            raise RuntimeError(f"No validateOTPToken in OTP generate response: {r2.text}")
+        logger.info("Auto-login step 2 (OTP generate) ✓")
+
+        # ── Step 3: verify TOTP ─────────────────────────────────────────────
+        totp_code = pyotp.TOTP(totp_secret).now()
+        r3 = await session.post(
+            f"{UPSTOX_SERVICE_URL}/login/open/v4/auth/1fa/otp-totp/verify",
+            json={"data": {"otp": totp_code, "validateOtpToken": validate_otp_token}},
+            headers=_browser_headers(),
+        )
+        if r3.status_code != 200:
+            raise RuntimeError(f"TOTP verify failed ({r3.status_code}): {r3.text}")
+        logger.info("Auto-login step 3 (TOTP) ✓")
+
+        # ── Step 4: submit PIN (base64-encoded) ─────────────────────────────
+        pin_b64 = base64.b64encode(pin.encode()).decode()
+        r4 = await session.post(
+            f"{UPSTOX_SERVICE_URL}/login/open/v3/auth/2fa",
+            params={
+                "client_id": api_key,
+                "redirect_uri": redirect_uri,
+            },
+            json={"data": {"twoFAMethod": "SECRET_PIN", "inputText": pin_b64}},
+            headers=_browser_headers(),
+        )
+        if r4.status_code != 200:
+            raise RuntimeError(f"PIN 2FA failed ({r4.status_code}): {r4.text}")
+        logger.info("Auto-login step 4 (PIN) ✓")
+
+        # ── Step 5: OAuth authorize → get auth code ─────────────────────────
+        r5 = await session.post(
+            f"{UPSTOX_SERVICE_URL}/login/v2/oauth/authorize",
+            params={
+                "client_id": api_key,
+                "redirect_uri": redirect_uri,
+                "requestId": _request_id(),
+                "response_type": "code",
+            },
+            json={"data": {"userOAuthApproval": True}},
+            headers=_browser_headers(),
+        )
+        if r5.status_code != 200:
+            raise RuntimeError(f"OAuth authorize failed ({r5.status_code}): {r5.text}")
+        redirect_url = r5.json().get("data", {}).get("redirectUri", "")
+        auth_code = parse_qs(urlparse(redirect_url).query).get("code", [None])[0]
+        if not auth_code:
+            raise RuntimeError(f"No auth code in OAuth authorize response: {r5.text}")
+        logger.info("Auto-login step 5 (OAuth) ✓")
+
+        # ── Step 6: exchange auth code for access token ─────────────────────
+        r6 = await session.post(
+            UPSTOX_TOKEN_URL,
+            data={
+                "code": auth_code,
+                "client_id": api_key,
+                "client_secret": api_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        )
+        if r6.status_code != 200:
+            raise RuntimeError(f"Token exchange failed ({r6.status_code}): {r6.text}")
+        access_token = r6.json().get("access_token", "")
+        if not access_token:
+            raise RuntimeError(f"No access_token in token-exchange response: {r6.text}")
+        logger.info("Auto-login step 6 (token exchange) ✓")
+
+        return access_token
 
 @api_router.get("/auth/login")
 async def auth_login():
@@ -318,19 +478,53 @@ async def auth_status():
     api_key = os.environ.get("UPSTOX_API_KEY")
     api_secret = os.environ.get("UPSTOX_API_SECRET")
     redirect_uri = os.environ.get("UPSTOX_REDIRECT_URI")
+    mobile = os.environ.get("UPSTOX_MOBILE", "")
+    pin = os.environ.get("UPSTOX_PIN", "")
+    totp_secret = os.environ.get("UPSTOX_TOTP_SECRET", "")
+    auto_login_ready = bool(
+        mobile and not mobile.startswith("your_") and
+        pin and not pin.startswith("your_") and
+        totp_secret
+    )
     return {
         "status": "success",
         "data": {
             "oauth_configured": bool(api_key and api_secret),
             "has_api_key": bool(api_key),
             "has_api_secret": bool(api_secret),
-            "redirect_uri": redirect_uri or "not set"
+            "redirect_uri": redirect_uri or "not set",
+            "auto_login_ready": auto_login_ready,
         }
     }
 
+
+@api_router.post("/auth/auto-login")
+async def trigger_auto_login(x_admin_key: str = Header(None)):
+    """
+    Headless auto-login: mobile → PIN → TOTP → access token.
+    Saves the token automatically. Protected by admin key.
+    """
+    admin_key = os.environ.get("ADMIN_KEY")
+    if not admin_key or x_admin_key != admin_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
+
+    try:
+        access_token = await upstox_headless_login()
+        await TokenStore.set_token(access_token)
+        logger.info("Auto-login: token saved successfully")
+        return {"status": "success", "message": "Logged in and token saved successfully"}
+    except RuntimeError as e:
+        logger.error(f"Auto-login failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Auto-login unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Auto-login failed unexpectedly")
+
+
 # ===== core headers using server token =====
 async def _upstox_headers() -> Dict[str, str]:
-    token = TokenStore.get_token()
+    # Prefer the long-lived Analytics Token (1-year, read-only) if configured
+    token = os.environ.get("UPSTOX_ANALYTICS_TOKEN", "").strip() or TokenStore.get_token()
     if not token or len(token) < 10:
         raise HTTPException(status_code=500, detail="Server Upstox token not configured")
     headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
@@ -343,37 +537,68 @@ async def _upstox_headers() -> Dict[str, str]:
 @api_router.get("/instruments/search")
 async def search_instruments(query: str = Query(..., min_length=2), exchange: Optional[str] = Query(None, pattern=r"^(NSE|BSE)$"), instrument_type: Optional[str] = None, limit: int = Query(50, ge=1, le=200)):
     ex_key = exchange if exchange else "complete"
-    instruments = await _get_instruments(ex_key)
+    await _get_instruments(ex_key)  # ensure cache is warm
     uq = query.upper()
-    results: List[Instrument] = []
-    exact_matches = []  # Trading symbol exact matches (highest priority)
-    prefix_matches = []  # Trading symbol prefix matches
-    other_matches = []   # Name matches
 
+    # Fast path: EQ search uses pre-sorted index + bisect (O(log n) prefix, O(k) results)
+    if instrument_type == "EQ" and ex_key in _instruments_eq_syms:
+        syms = _instruments_eq_syms[ex_key]
+        eq_list = _instruments_eq_sorted[ex_key]
+        exact_matches = []
+        prefix_matches = []
+        substr_matches = []
+        name_matches = []
+
+        # Binary search for the start of prefix range
+        lo = bisect.bisect_left(syms, uq)
+        hi = bisect.bisect_left(syms, uq[:-1] + chr(ord(uq[-1]) + 1)) if uq else len(syms)
+
+        seen: set = set()
+        for i in range(lo, min(hi, len(syms))):
+            inst = eq_list[i]
+            sym = syms[i]
+            if sym == uq:
+                exact_matches.append(inst)
+            else:
+                prefix_matches.append(inst)
+            seen.add(i)
+            if len(exact_matches) + len(prefix_matches) >= limit:
+                break
+
+        # If we still need more results, scan for substring/name matches
+        if len(exact_matches) + len(prefix_matches) < limit:
+            for i, inst in enumerate(eq_list):
+                if i in seen:
+                    continue
+                sym = syms[i]
+                nm = (inst.name or "").upper()
+                if uq in sym:
+                    substr_matches.append(inst)
+                elif uq in nm:
+                    name_matches.append(inst)
+
+        results = (exact_matches + prefix_matches + substr_matches + name_matches)[:limit]
+        return {"status": "success", "count": len(results), "data": [r.dict() for r in results]}
+
+    # Generic path: full scan (for non-EQ or missing index)
+    instruments = _instruments_cache.get(ex_key, [])
+    exact_matches = []
+    prefix_matches = []
+    other_matches = []
     for inst in instruments:
         sym = (inst.tradingsymbol or "").upper()
         nm = (inst.name or "").upper()
-
-        if instrument_type and (inst.instrument_type != instrument_type):
+        if instrument_type and inst.instrument_type != instrument_type:
             continue
-
-        # Priority 1: Exact symbol match (e.g., "TCS" matches "TCS" exactly)
         if sym == uq:
             exact_matches.append(inst)
-        # Priority 2: Symbol starts with query (e.g., "REL" matches "RELIANCE")
         elif sym.startswith(uq):
             prefix_matches.append(inst)
-        # Priority 3: Symbol contains query (e.g., "LI" matches "RELIANCE")
         elif uq in sym:
             prefix_matches.append(inst)
-        # Priority 4: Name contains query (e.g., "RELIANCE INDUSTRIES")
         elif uq in nm:
             other_matches.append(inst)
-
-    # Combine results in priority order
-    results = exact_matches + prefix_matches + other_matches
-    results = results[:limit]
-
+    results = (exact_matches + prefix_matches + other_matches)[:limit]
     return {"status": "success", "count": len(results), "data": [r.dict() for r in results]}
 
 class QuotePayload(BaseModel):
@@ -930,103 +1155,133 @@ class TokenRefreshStatus(BaseModel):
     error_message: Optional[str] = None
 
 async def refresh_upstox_token():
-    """Check token validity daily at 9:00 AM IST and flag if expired"""
+    """
+    Daily job at 9:00 AM IST:
+    1. If auto-login credentials are configured → headless login, save fresh token.
+    2. Otherwise → validate existing token and flag if expired.
+    """
+    now = datetime.now(timezone.utc).isoformat()
     try:
-        logger.info("Starting daily token validity check...")
+        mobile = os.environ.get("UPSTOX_MOBILE", "")
+        pin    = os.environ.get("UPSTOX_PIN", "")
+        totp   = os.environ.get("UPSTOX_TOTP_SECRET", "")
+        auto_login_ready = bool(
+            mobile and not mobile.startswith("your_") and
+            pin and not pin.startswith("your_") and
+            totp
+        )
 
+        if auto_login_ready:
+            # ── Auto-login path ────────────────────────────────────────────
+            logger.info("Scheduler: running headless auto-login...")
+            try:
+                access_token = await upstox_headless_login()
+                await TokenStore.set_token(access_token)
+                logger.info("Scheduler: auto-login succeeded, token saved ✓")
+                await db.config.update_one(
+                    {"id": "token_refresh_status"},
+                    {"$set": {
+                        "id": "token_refresh_status",
+                        "last_refresh": now,
+                        "status": "auto_login_success",
+                        "error_message": None,
+                        "needs_refresh": False,
+                    }},
+                    upsert=True,
+                )
+            except Exception as login_err:
+                logger.error(f"Scheduler: auto-login failed: {login_err}")
+                await db.config.update_one(
+                    {"id": "token_refresh_status"},
+                    {"$set": {
+                        "id": "token_refresh_status",
+                        "last_refresh": now,
+                        "status": "auto_login_failed",
+                        "error_message": str(login_err),
+                        "needs_refresh": True,
+                    }},
+                    upsert=True,
+                )
+            return
+
+        # ── Manual-token validation path ───────────────────────────────────
+        logger.info("Scheduler: auto-login not configured, checking existing token...")
         current_token = TokenStore.get_token()
 
         if not current_token:
-            logger.warning("No token found - user needs to authenticate via OAuth")
+            logger.warning("No token found - fill UPSTOX_MOBILE and UPSTOX_PIN in .env for auto-login")
             await db.config.update_one(
                 {"id": "token_refresh_status"},
-                {
-                    "$set": {
-                        "id": "token_refresh_status",
-                        "last_refresh": datetime.now(timezone.utc).isoformat(),
-                        "status": "token_missing",
-                        "error_message": "No token available - please login via OAuth",
-                        "needs_refresh": True
-                    }
-                },
-                upsert=True
+                {"$set": {
+                    "id": "token_refresh_status",
+                    "last_refresh": now,
+                    "status": "token_missing",
+                    "error_message": "No token available. Fill UPSTOX_MOBILE & UPSTOX_PIN in .env to enable auto-login.",
+                    "needs_refresh": True,
+                }},
+                upsert=True,
             )
             return
 
-        # Check if token is still valid by making a test API call
         try:
             async with httpx.AsyncClient(timeout=10.0) as session:
                 resp = await session.get(
                     f"{UPSTOX_BASE_URL}/user/profile",
                     headers={"Authorization": f"Bearer {current_token}"}
                 )
-
                 if resp.status_code == 200:
-                    # Token is valid
-                    logger.info("✓ Token is still valid - no refresh needed")
+                    logger.info("✓ Token is still valid")
                     await db.config.update_one(
                         {"id": "token_refresh_status"},
-                        {
-                            "$set": {
-                                "id": "token_refresh_status",
-                                "last_refresh": datetime.now(timezone.utc).isoformat(),
-                                "status": "valid",
-                                "error_message": None,
-                                "needs_refresh": False
-                            }
-                        },
-                        upsert=True
+                        {"$set": {
+                            "id": "token_refresh_status",
+                            "last_refresh": now,
+                            "status": "valid",
+                            "error_message": None,
+                            "needs_refresh": False,
+                        }},
+                        upsert=True,
                     )
                     return
-
-                # Token invalid (401/403)
                 if resp.status_code in [401, 403]:
-                    logger.warning("⚠ Token expired - user needs to re-login via OAuth")
+                    logger.warning("⚠ Token expired - fill UPSTOX_MOBILE & UPSTOX_PIN in .env for auto-login")
                     await db.config.update_one(
                         {"id": "token_refresh_status"},
-                        {
-                            "$set": {
-                                "id": "token_refresh_status",
-                                "last_refresh": datetime.now(timezone.utc).isoformat(),
-                                "status": "expired",
-                                "error_message": "Token expired at 3:30 AM IST - please login via OAuth",
-                                "needs_refresh": True
-                            }
-                        },
-                        upsert=True
+                        {"$set": {
+                            "id": "token_refresh_status",
+                            "last_refresh": now,
+                            "status": "expired",
+                            "error_message": "Token expired. Fill UPSTOX_MOBILE & UPSTOX_PIN in .env to enable auto-login.",
+                            "needs_refresh": True,
+                        }},
+                        upsert=True,
                     )
                     return
-
-                raise ValueError(f"Unexpected response: {resp.status_code}")
-
+                raise ValueError(f"Unexpected status: {resp.status_code}")
         except Exception as check_error:
-            logger.error(f"Token validity check failed: {check_error}")
+            logger.error(f"Token check failed: {check_error}")
             await db.config.update_one(
                 {"id": "token_refresh_status"},
-                {
-                    "$set": {
-                        "id": "token_refresh_status",
-                        "last_refresh": datetime.now(timezone.utc).isoformat(),
-                        "status": "check_failed",
-                        "error_message": str(check_error)
-                    }
-                },
-                upsert=True
+                {"$set": {
+                    "id": "token_refresh_status",
+                    "last_refresh": now,
+                    "status": "check_failed",
+                    "error_message": str(check_error),
+                }},
+                upsert=True,
             )
 
     except Exception as e:
-        logger.error(f"Daily token check failed: {str(e)}")
+        logger.error(f"Daily token job failed: {e}")
         await db.config.update_one(
             {"id": "token_refresh_status"},
-            {
-                "$set": {
-                    "id": "token_refresh_status",
-                    "status": "failed",
-                    "error_message": str(e),
-                    "last_attempt": datetime.now(timezone.utc).isoformat()
-                }
-            },
-            upsert=True
+            {"$set": {
+                "id": "token_refresh_status",
+                "status": "failed",
+                "error_message": str(e),
+                "last_attempt": now,
+            }},
+            upsert=True,
         )
 
 @app.on_event("startup")
