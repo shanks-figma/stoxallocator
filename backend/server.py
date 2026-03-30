@@ -514,7 +514,8 @@ async def trigger_auto_login(x_admin_key: str = Header(None)):
 
 # ===== core headers using server token =====
 async def _upstox_headers() -> Dict[str, str]:
-    token = TokenStore.get_token()
+    # Prefer the long-lived Analytics Token (1-year, read-only) if configured
+    token = os.environ.get("UPSTOX_ANALYTICS_TOKEN", "").strip() or TokenStore.get_token()
     if not token or len(token) < 10:
         raise HTTPException(status_code=500, detail="Server Upstox token not configured")
     headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
