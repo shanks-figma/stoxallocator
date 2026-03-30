@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
 import { Trash2, Plus, Minus, IndianRupee, RefreshCw, Shield, CheckCircle, XCircle, AlertCircle, TrendingUp, Wallet, BarChart2, ChevronRight, ChevronUp, ChevronDown, Sun, Moon, Zap, GripVertical, ArrowRight, PieChart, Activity } from "lucide-react";
+import { Analytics } from '@vercel/analytics/react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API_BASE = `${BACKEND_URL}/api`;
@@ -1660,6 +1661,7 @@ function App() {
         <Route path="/landing-2" element={<LandingPage2 />} />
         <Route path="/*" element={<AppLayout />} />
       </Routes>
+      <Analytics />
     </BrowserRouter>
   );
 }
