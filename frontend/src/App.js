@@ -91,16 +91,15 @@ function AllocatorPage() {
   useEffect(() => { let timerId; const poll = async () => { try { const keys = portfolio.map(p => p.instrument_key); if (keys.length === 0) return; const { data } = await api.post("/quotes/ltp", { instrument_keys: keys }); setPrices(data.data || {}); } catch (e) { console.error("LTP poll error", e?.response?.data || e.message); } }; poll(); timerId = setInterval(poll, 15000); setPolling(true); return () => { clearInterval(timerId); setPolling(false); }; }, [portfolio, api]);
 
   const portfolioWithLTP = useMemo(() => {
-    const n = portfolio.length;
-    const totalWeight = n * (n + 1) / 2;
-    return portfolio.map((item, index) => {
+    const totalWeight = portfolio.reduce((sum, item) => sum + (6 - (item.priority || 3)), 0);
+    return portfolio.map((item) => {
       const quote = prices[item.instrument_key];
       const ltp = quote?.last_price ?? item.last_price ?? null;
       const qty = Number(item.qty) || 0;
       const total = ltp ? ltp * qty : 0;
       const additional = total ? computeAdditionalCost(total, exchange) : 0;
       const finalCost = total + additional;
-      const weight = n - index;
+      const weight = 6 - (item.priority || 3);
       const allocatedBudget = totalWeight > 0 ? (weight / totalWeight) * (Number(budget) || 0) : 0;
       return { ...item, ltp, total, additional, finalCost, allocatedBudget };
     });
@@ -111,24 +110,22 @@ function AllocatorPage() {
   const remaining = useMemo(() => (Number(budget) || 0) - finalCostTotal, [budget, finalCostTotal]);
   const progressPct = budget > 0 ? Math.min((finalCostTotal / budget) * 100, 100) : 0;
 
-  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
+  const addToPortfolio = (inst) => { const exists = portfolio.find(p => p.instrument_key === inst.instrument_key); if (exists) return; setPortfolio(prev => [...prev, { instrument_key: inst.instrument_key, tradingsymbol: inst.tradingsymbol, name: inst.name, qty: 1, priority: 3, last_price: inst.last_price || null }]); setQuery(""); setResults([]); };
   const removeFromPortfolio = (instrument_key) => { setPortfolio(prev => prev.filter(p => p.instrument_key !== instrument_key)); };
   const updateQty = (instrument_key, qty) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, qty: Math.max(0, Number(qty) || 0) } : p)); };
+  const updatePriority = (instrument_key, priority) => { setPortfolio(prev => prev.map(p => p.instrument_key === instrument_key ? { ...p, priority: Math.min(5, Math.max(1, Number(priority) || 3)) } : p)); };
   const moveUp = (index) => { if (index === 0) return; setPortfolio(prev => { const next = [...prev]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; }); };
   const moveDown = (index) => { setPortfolio(prev => { if (index === prev.length - 1) return prev; const next = [...prev]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; }); };
   const autoAllocate = () => {
     const eligible = portfolioWithLTP.filter(item => item.ltp > 0);
     if (eligible.length === 0) return;
-    const n = eligible.length;
-    const totalWeight = n * (n + 1) / 2;
+    const totalWeight = eligible.reduce((sum, item) => sum + (6 - (item.priority || 3)), 0);
     const totalBudget = Number(budget) || 0;
 
-    // Step 1: initial weighted allocation using Math.floor
+    // Step 1: initial priority-weighted allocation using Math.floor
     const qtys = {};
-    let eligibleIndex = 0;
     for (const item of eligible) {
-      const weight = n - eligibleIndex;
-      eligibleIndex++;
+      const weight = 6 - (item.priority || 3);
       const allocatedBudget = (weight / totalWeight) * totalBudget;
       qtys[item.instrument_key] = Math.max(0, Math.floor(allocatedBudget / item.ltp));
     }
@@ -282,6 +279,16 @@ function AllocatorPage() {
                       <tr className="border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
                         <th className="w-10 px-3 py-3"></th>
                         <th className="text-left text-xs text-gray-400 dark:text-slate-500 font-medium pr-3 pl-0 py-3">Stock</th>
+                        <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger className="cursor-help underline decoration-dotted">Priority</TooltipTrigger>
+                              <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200 text-xs max-w-xs">
+                                1 = highest budget share, 5 = lowest. Weight = 6 − priority.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </th>
                         <th className="text-center text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Qty</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">LTP</th>
                         <th className="text-right text-xs text-gray-400 dark:text-slate-500 font-medium px-3 py-3">Value</th>
@@ -316,6 +323,21 @@ function AllocatorPage() {
                           <td className="pr-3 pl-0 py-3.5">
                             <div className="font-semibold text-gray-900 dark:text-white">{row.tradingsymbol || row.name}</div>
                             <div className="text-xs text-slate-500 truncate max-w-[160px]">{row.name}</div>
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <input
+                                type="number" min="1" max="5"
+                                value={row.priority || 3}
+                                onChange={(e) => updatePriority(row.instrument_key, e.target.value)}
+                                className="h-8 w-12 text-center text-sm bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              {row.ltp > 0 && (
+                                <span className="text-[10px] text-emerald-400/70 font-mono whitespace-nowrap">
+                                  ~{formatINR(row.allocatedBudget)}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-3 py-3.5 text-center">
                             <div className="inline-flex items-center border border-gray-200 dark:border-slate-700 rounded-md overflow-hidden">
