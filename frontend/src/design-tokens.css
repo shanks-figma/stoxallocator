@@ -1,0 +1,339 @@
+/*
+ * ============================================================
+ * StoxAllocator Design System — v1.0
+ * ============================================================
+ *
+ * Single source of truth for all visual tokens.
+ * Used by:
+ *   - CSS (var(--ds-*))
+ *   - Tailwind (extended theme in tailwind.config.js)
+ *   - JS inline styles (src/tokens.js)
+ *
+ * Palette origin: LandingPage — dark navy + blue gradient
+ * ============================================================
+ */
+
+:root {
+  /* ── Fonts ─────────────────────────────────────────────── */
+  --ds-font-sans:   'Geist', system-ui, -apple-system, sans-serif;
+  --ds-font-serif:  'Young Serif', Georgia, serif;
+  --ds-font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ── Type Scale ─────────────────────────────────────────── */
+  --ds-text-2xs:   11px;
+  --ds-text-xs:    12px;
+  --ds-text-sm:    13.5px;
+  --ds-text-base:  15px;
+  --ds-text-md:    16px;
+  --ds-text-lg:    18px;
+  --ds-text-xl:    22px;
+  --ds-text-2xl:   28px;
+  --ds-text-3xl:   36px;
+  --ds-text-hero:  clamp(42px, 5vw, 64px);
+
+  /* ── Font Weights ───────────────────────────────────────── */
+  --ds-weight-light:    300;
+  --ds-weight-regular:  400;
+  --ds-weight-medium:   500;
+  --ds-weight-semibold: 600;
+  --ds-weight-bold:     700;
+
+  /* ── Line Heights ───────────────────────────────────────── */
+  --ds-leading-tight:   1.1;
+  --ds-leading-snug:    1.3;
+  --ds-leading-normal:  1.5;
+  --ds-leading-relaxed: 1.65;
+
+  /* ── Letter Spacing ─────────────────────────────────────── */
+  --ds-tracking-tight:  -0.3px;
+  --ds-tracking-normal: -0.1px;
+  --ds-tracking-wide:   0.05em;
+  --ds-tracking-wider:  0.08em;
+
+  /* ── Brand Palette ──────────────────────────────────────── */
+  --ds-brand-navy:        #00419B;   /* gradient start / deep brand */
+  --ds-brand-blue:        #2A9BCC;   /* gradient end / mid brand   */
+  --ds-brand-sky:         #38bdf8;   /* headline accent / highlights */
+  --ds-brand-gradient:    linear-gradient(to right, #00419B, #2A9BCC);
+  --ds-brand-gradient-45: linear-gradient(135deg, #00419B, #2A9BCC);
+
+  /* ── Backgrounds ────────────────────────────────────────── */
+  --ds-bg-page:     #06090f;   /* true page base */
+  --ds-bg-surface:  #0d1117;   /* cards, panels */
+  --ds-bg-elevated: #111827;   /* dropdowns, modals */
+  --ds-bg-input:    #0f1623;   /* form inputs */
+  --ds-bg-hover:    rgba(255, 255, 255, 0.04);
+  --ds-bg-active:   rgba(255, 255, 255, 0.07);
+  --ds-bg-overlay:  rgba(6, 9, 15, 0.75);  /* modal backdrop */
+
+  /* ── Borders ────────────────────────────────────────────── */
+  --ds-border-subtle:   rgba(255, 255, 255, 0.06);
+  --ds-border-default:  rgba(255, 255, 255, 0.10);
+  --ds-border-strong:   rgba(255, 255, 255, 0.18);
+  --ds-border-brand:    rgba(42, 155, 204, 0.35);
+
+  /* ── Text ───────────────────────────────────────────────── */
+  --ds-text-primary:   #ffffff;
+  --ds-text-secondary: rgba(255, 255, 255, 0.65);
+  --ds-text-muted:     rgba(255, 255, 255, 0.40);
+  --ds-text-disabled:  rgba(255, 255, 255, 0.20);
+  --ds-text-inverse:   #0a0f1a;   /* on white/light bg */
+  --ds-text-accent:    #38bdf8;   /* sky blue, same as brand-sky */
+
+  /* ── Semantic / Functional Colors ───────────────────────── */
+  --ds-positive:      #10b981;   /* gains, success */
+  --ds-positive-dim:  rgba(16, 185, 129, 0.15);
+  --ds-negative:      #ef4444;   /* losses, error */
+  --ds-negative-dim:  rgba(239, 68,  68,  0.15);
+  --ds-warning:       #f59e0b;   /* caution */
+  --ds-warning-dim:   rgba(245, 158, 11,  0.15);
+  --ds-info:          #38bdf8;   /* info / neutral highlight */
+  --ds-info-dim:      rgba(56, 189, 248, 0.15);
+
+  /* ── Spacing Scale ──────────────────────────────────────── */
+  --ds-space-1:  4px;
+  --ds-space-2:  8px;
+  --ds-space-3:  12px;
+  --ds-space-4:  16px;
+  --ds-space-5:  20px;
+  --ds-space-6:  24px;
+  --ds-space-8:  32px;
+  --ds-space-10: 40px;
+  --ds-space-12: 48px;
+  --ds-space-16: 64px;
+
+  /* ── Border Radius ──────────────────────────────────────── */
+  --ds-radius-xs: 4px;
+  --ds-radius-sm: 6px;
+  --ds-radius:    8px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 12px;
+  --ds-radius-xl: 16px;
+  --ds-radius-full: 9999px;
+
+  /* ── Shadows ────────────────────────────────────────────── */
+  --ds-shadow-sm:    0 1px 3px rgba(0,0,0,0.4);
+  --ds-shadow:       0 4px 12px rgba(0,0,0,0.5);
+  --ds-shadow-lg:    0 8px 32px rgba(0,0,0,0.6);
+  --ds-shadow-brand: 0 4px 20px rgba(42, 155, 204, 0.25);
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  --ds-container-max: 1200px;
+  --ds-container-pad: 40px;
+  --ds-navbar-height: 56px;
+
+  /* ── Transitions ────────────────────────────────────────── */
+  --ds-transition-fast:   0.12s ease;
+  --ds-transition:        0.2s ease;
+  --ds-transition-slow:   0.35s ease;
+
+  /* ── Z-index Stack ──────────────────────────────────────── */
+  --ds-z-base:    0;
+  --ds-z-raised:  10;
+  --ds-z-sticky:  100;
+  --ds-z-overlay: 200;
+  --ds-z-modal:   300;
+  --ds-z-toast:   400;
+}
+
+
+/* ============================================================
+ * Shadcn/ui token bridge — map DS tokens → shadcn vars
+ * (dark mode only — the app runs dark)
+ * ============================================================ */
+.dark, :root {
+  --background:          6 14% 4%;        /* ≈ #06090f */
+  --foreground:          0 0% 100%;
+
+  --card:                220 18% 7%;      /* ≈ #0d1117 */
+  --card-foreground:     0 0% 100%;
+
+  --popover:             220 18% 9%;      /* ≈ #111827 */
+  --popover-foreground:  0 0% 100%;
+
+  --primary:             199 93% 60%;     /* ≈ #38bdf8 sky-blue */
+  --primary-foreground:  220 20% 6%;
+
+  --secondary:           220 14% 10%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted:               220 14% 10%;
+  --muted-foreground:    0 0% 40%;
+
+  --accent:              199 93% 60%;
+  --accent-foreground:   220 20% 6%;
+
+  --destructive:         0 63% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border:              220 14% 12%;
+  --input:               220 14% 10%;
+  --ring:                204 74% 47%;     /* ≈ #2A9BCC */
+
+  --radius: 0.5rem;
+}
+
+
+/* ============================================================
+ * Utility classes built on DS tokens
+ * ============================================================ */
+
+/* Containers */
+.ds-container {
+  width: 100%;
+  max-width: var(--ds-container-max);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--ds-container-pad);
+  padding-right: var(--ds-container-pad);
+}
+
+/* Buttons */
+.ds-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: 11px var(--ds-space-6);
+  background: var(--ds-brand-gradient);
+  color: var(--ds-text-primary);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-base);
+  font-weight: var(--ds-weight-medium);
+  border: none;
+  border-radius: var(--ds-radius);
+  cursor: pointer;
+  letter-spacing: var(--ds-tracking-normal);
+  transition: opacity var(--ds-transition);
+}
+.ds-btn-primary:hover { opacity: 0.85; }
+
+.ds-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: 10px var(--ds-space-6);
+  background: white;
+  color: var(--ds-text-inverse);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-base);
+  font-weight: var(--ds-weight-medium);
+  border: 1.5px solid rgba(255,255,255,0.85);
+  border-radius: var(--ds-radius);
+  cursor: pointer;
+  transition: background var(--ds-transition);
+}
+.ds-btn-secondary:hover { background: rgba(255,255,255,0.85); }
+
+.ds-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: 8px var(--ds-space-3);
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-sm);
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  cursor: pointer;
+  transition: color var(--ds-transition), background var(--ds-transition);
+}
+.ds-btn-ghost:hover {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-hover);
+}
+
+/* Cards */
+.ds-card {
+  background: var(--ds-bg-surface);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-lg);
+  padding: var(--ds-space-6);
+}
+
+.ds-card-elevated {
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow);
+}
+
+/* Inputs */
+.ds-input {
+  background: var(--ds-bg-input);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius);
+  color: var(--ds-text-primary);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-base);
+  padding: 9px var(--ds-space-3);
+  transition: border-color var(--ds-transition);
+  outline: none;
+}
+.ds-input:focus {
+  border-color: var(--ds-brand-blue);
+  box-shadow: 0 0 0 3px rgba(42, 155, 204, 0.15);
+}
+
+/* Typography helpers */
+.ds-heading {
+  font-family: var(--ds-font-serif);
+  font-weight: var(--ds-weight-light);
+  color: var(--ds-text-primary);
+  line-height: var(--ds-leading-tight);
+  letter-spacing: var(--ds-tracking-tight);
+}
+
+.ds-label {
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-xs);
+  font-weight: var(--ds-weight-semibold);
+  letter-spacing: var(--ds-tracking-wider);
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+.ds-text-accent {
+  color: var(--ds-text-accent);
+}
+
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: 3px 10px;
+  border-radius: var(--ds-radius-full);
+  font-size: var(--ds-text-xs);
+  font-weight: var(--ds-weight-medium);
+  background: var(--ds-info-dim);
+  color: var(--ds-brand-sky);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+/* Dividers */
+.ds-divider {
+  border: none;
+  border-top: 1px solid var(--ds-border-subtle);
+  margin: var(--ds-space-4) 0;
+}
+
+/* Positive / negative text */
+.ds-positive { color: var(--ds-positive); }
+.ds-negative { color: var(--ds-negative); }
+.ds-warning  { color: var(--ds-warning);  }
+
+/* Gradient text */
+.ds-gradient-text {
+  background: var(--ds-brand-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Scrollbar */
+.ds-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.ds-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.ds-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ds-border-strong);
+  border-radius: var(--ds-radius-full);
+}

@@ -12,7 +12,26 @@ module.exports = {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
+  		fontFamily: {
+  			sans:  ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
+  			serif: ['Young Serif', 'Georgia', 'serif'],
+  			mono:  ['JetBrains Mono', 'Fira Code', 'monospace'],
+  		},
   		colors: {
+  			// ── Brand ─────────────────────────────────────────
+  			brand: {
+  				navy:    '#00419B',
+  				blue:    '#2A9BCC',
+  				sky:     '#38bdf8',
+  			},
+  			// ── App surfaces ──────────────────────────────────
+  			page:     '#06090f',
+  			surface:  '#0d1117',
+  			elevated: '#111827',
+  			// ── Semantic ──────────────────────────────────────
+  			positive: '#10b981',
+  			negative: '#ef4444',
+  			// ── shadcn pass-through ───────────────────────────
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
