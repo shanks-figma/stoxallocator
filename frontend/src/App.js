@@ -1501,69 +1501,96 @@ function OrderExperimentPage() {
 function useEditKey() { const [editKey, setEditKey] = useLocalStorageState("stox_edit_key", ""); return { editKey, setEditKey }; }
 
 function LandingPage() {
-  const { theme, setTheme } = useTheme();
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col">
-      {/* Minimal top bar */}
-      <header className="px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
-            <TrendingUp className="h-4 w-4 text-white" />
+    <div style={{ minHeight: "100vh", fontFamily: "'Geist', sans-serif", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", background: "#06090f" }}>
+
+      {/* Full-page background image */}
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: "url('/bg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center right",
+        backgroundRepeat: "no-repeat",
+      }} />
+
+      {/* Content */}
+      <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <div style={{ width: "100%", maxWidth: 1200, margin: "0 auto", padding: "28px 40px", display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+
+        {/* Logo + Nav */}
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <img src="/logo.svg" alt="StoxAllocator logo" style={{ height: 24, width: "auto" }} />
+          <Link to="/app" style={{ textDecoration: "none" }}>
+            <button style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 22px", background: "white", color: "#0a0f1a",
+              fontFamily: "'Geist', sans-serif", fontWeight: 500, fontSize: 14,
+              border: "1.5px solid rgba(255,255,255,0.85)", borderRadius: 8, cursor: "pointer",
+              letterSpacing: "-0.1px", transition: "background 0.2s, color 0.2s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.85)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "white"; }}
+            >
+              Open Allocator <ArrowRight size={14} />
+            </button>
+          </Link>
+        </header>
+
+        {/* Hero */}
+        <main style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", width: "70%", paddingTop: 40, paddingBottom: 40 }}>
+
+          {/* Headline */}
+          <h1 style={{ fontFamily: "'Young Serif', serif", fontSize: "clamp(42px, 5vw, 64px)", lineHeight: 1.1, fontWeight: 300, margin: "0 0 28px 0", color: "white" }}>
+            Allocate your<br />Stocks Investment,<br /><span style={{ color: "#38bdf8" }}>smarter.</span>
+          </h1>
+
+          {/* Description */}
+          <p style={{ color: "white", fontSize: 18, lineHeight: 1.65, margin: "0 0 36px 0", maxWidth: 420 }}>
+            Search stocks, set priorities, and auto-allocate your investment budget across your portfolio — with real-time prices and brokerage cost calculations.
+          </p>
+
+          {/* CTA */}
+          <div style={{ marginBottom: 44 }}>
+            <Link to="/app" style={{ textDecoration: "none" }}>
+              <button style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                padding: "13px 28px", background: "linear-gradient(to right, #00419B, #2A9BCC)", color: "white",
+                fontFamily: "'Geist', sans-serif", fontWeight: 500, fontSize: 15,
+                border: "none", borderRadius: 8, cursor: "pointer", letterSpacing: "-0.1px",
+                transition: "opacity 0.2s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                Open Allocator <ArrowRight size={16} />
+              </button>
+            </Link>
           </div>
-          <span className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">Stox<span className="text-emerald-500 dark:text-emerald-400">Allocator</span></span>
-        </div>
-        <button
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-all"
-          title="Toggle theme"
-        >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-      </header>
 
-      {/* Hero */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-medium mb-8">
-          <Activity className="h-3 w-3" /> Live market prices via Upstox
-        </div>
+          {/* Feature list */}
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              "Auto-allocation based on priority",
+              "Brokerage & charges included",
+              "Live Prices every 30s",
+              "More coming soon....",
+            ].map(item => (
+              <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, color: "rgba(255,255,255,0.5)", fontSize: 13.5 }}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M6.5 0L8.2 4.3L13 6.5L8.2 8.7L6.5 13L4.8 8.7L0 6.5L4.8 4.3L6.5 0Z" fill="rgba(56,189,248,0.5)"/>
+                </svg>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </main>
 
-        {/* Headline */}
-        <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 dark:text-white leading-tight max-w-2xl mb-5">
-          Allocate your budget,<br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">smarter.</span>
-        </h1>
-
-        {/* Subtext */}
-        <p className="text-lg text-gray-500 dark:text-slate-400 max-w-lg mb-10">
-          Search stocks, set priorities, and auto-allocate your investment budget across your portfolio — with real-time prices and brokerage cost calculations.
-        </p>
-
-        {/* CTA */}
-        <Link to="/app">
-          <button className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-base transition-colors shadow-lg shadow-emerald-500/20">
-            Open Allocator <ArrowRight className="h-4 w-4" />
-          </button>
-        </Link>
-
-        {/* Feature pills */}
-        <div className="flex flex-wrap justify-center gap-3 mt-14">
-          {[
-            { icon: <Zap className="h-3.5 w-3.5" />, label: "Priority-based auto-allocation" },
-            { icon: <PieChart className="h-3.5 w-3.5" />, label: "Brokerage & charges included" },
-            { icon: <TrendingUp className="h-3.5 w-3.5" />, label: "Live LTP every 30s" },
-            { icon: <Wallet className="h-3.5 w-3.5" />, label: "Budget tracking" },
-          ].map(({ icon, label }) => (
-            <div key={label} className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 text-sm">
-              <span className="text-emerald-500">{icon}</span>{label}
-            </div>
-          ))}
-        </div>
-      </main>
-
-      <footer className="py-6 text-center text-xs text-gray-400 dark:text-slate-600">
-        Built for Indian equity markets · NSE &amp; BSE
-      </footer>
+        {/* Footer */}
+        <footer style={{ color: "rgba(255,255,255,0.3)", fontSize: 12 }}>
+          Built for Indian equity markets · NSE &amp; BSE
+        </footer>
+      </div>
+      </div>
     </div>
   );
 }
