@@ -153,29 +153,41 @@ _instruments_updated_at: Dict[str, datetime] = {}
 _instruments_eq_sorted: Dict[str, List[Instrument]] = {}
 _instruments_eq_syms: Dict[str, List[str]] = {}  # parallel uppercase symbol list for bisect
 
-async def _download_instruments(exchange: str = "complete") -> List[Instrument]:
-    url = INSTRUMENTS_URLS.get(exchange, INSTRUMENTS_URLS["complete"])
+async def _download_instruments(exchange: str = "NSE") -> List[Instrument]:
+    # Never load "complete" — it includes derivatives/commodities and blows memory.
+    # Map "complete" to fetching NSE + BSE separately.
+    if exchange == "complete":
+        nse = await _download_instruments("NSE")
+        bse = await _download_instruments("BSE")
+        combined = nse + bse
+        _instruments_cache["complete"] = combined
+        _instruments_updated_at["complete"] = datetime.now(timezone.utc)
+        return combined
+
+    url = INSTRUMENTS_URLS.get(exchange, INSTRUMENTS_URLS["NSE"])
     async with httpx.AsyncClient(timeout=40.0) as session:
         resp = await session.get(url)
         resp.raise_for_status()
         raw = gzip.decompress(resp.content)
         data = json.loads(raw.decode("utf-8"))
+        # Filter to EQ only — drops F&O, currency, commodity rows immediately
         instruments: List[Instrument] = []
         for item in data:
             try:
+                if item.get("instrument_type") != "EQ":
+                    continue
                 instruments.append(Instrument(**item))
             except Exception:
                 continue
         _instruments_cache[exchange] = instruments
         _instruments_updated_at[exchange] = datetime.now(timezone.utc)
         # Build sorted EQ index for fast binary-search prefix lookup
-        eq = [i for i in instruments if i.instrument_type == "EQ"]
-        eq.sort(key=lambda i: (i.tradingsymbol or "").upper())
+        eq = sorted(instruments, key=lambda i: (i.tradingsymbol or "").upper())
         _instruments_eq_sorted[exchange] = eq
         _instruments_eq_syms[exchange] = [(i.tradingsymbol or "").upper() for i in eq]
         return instruments
 
-async def _get_instruments(exchange: str = "complete") -> List[Instrument]:
+async def _get_instruments(exchange: str = "NSE") -> List[Instrument]:
     needs_refresh = False
     if exchange not in _instruments_cache:
         needs_refresh = True
@@ -536,7 +548,7 @@ async def _upstox_headers() -> Dict[str, str]:
 # ===== Endpoints (quotes/instruments unchanged signature but ignore client token) =====
 @api_router.get("/instruments/search")
 async def search_instruments(query: str = Query(..., min_length=2), exchange: Optional[str] = Query(None, pattern=r"^(NSE|BSE)$"), instrument_type: Optional[str] = None, limit: int = Query(50, ge=1, le=200)):
-    ex_key = exchange if exchange else "complete"
+    ex_key = exchange if exchange else "NSE"
     await _get_instruments(ex_key)  # ensure cache is warm
     uq = query.upper()
 
